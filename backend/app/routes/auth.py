@@ -1,12 +1,23 @@
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from fastapi.security import OAuth2PasswordRequestForm
-from datetime import datetime
+from datetime import datetime, timedelta
+from jose import jwt, JWTError
+from bson import ObjectId
+from app.core.config import settings
 from bson import ObjectId
 from app.schemas.user import UserCreate, UserResponse, Token, LoginRequest
 from app.core.security import verify_password, get_password_hash, create_access_token
 from app.core.deps import get_current_user
 from app.database.connection import users_collection
-from app.services.email import send_welcome_email
+from app.services.email import send_welcome_email, send_password_reset_email
+from pydantic import BaseModel
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -61,6 +72,55 @@ def login_json(request: LoginRequest):
     
     access_token = create_access_token(data={"sub": str(user["_id"])})
     return {"access_token": access_token, "token_type": "bearer"}
+
+@router.post("/forgot-password")
+async def forgot_password(request: ForgotPasswordRequest, background_tasks: BackgroundTasks):
+    user = users_collection.find_one({"email": request.email})
+    if not user:
+        # To prevent email enumeration, return a success response even if not found
+        return {"message": "If an account exists with that email, a reset link has been sent."}
+        
+    # Generate a secure reset token valid for 30 minutes
+    expires = timedelta(minutes=30)
+    reset_token = create_access_token(
+        data={"sub": request.email, "type": "reset_password"},
+        expires_delta=expires
+    )
+    
+    # Using front-end URL (default vite port 5173 is assumed here, but can come from settings)
+    reset_link = f"http://localhost:5173/reset-password?token={reset_token}"
+    
+    background_tasks.add_task(send_password_reset_email, request.email, user.get("name", "User"), reset_link)
+    
+    return {"message": "If an account exists with that email, a reset link has been sent."}
+
+@router.post("/reset-password")
+async def reset_password(request: ResetPasswordRequest):
+    try:
+        payload = jwt.decode(request.token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        email: str = payload.get("sub")
+        token_type: str = payload.get("type")
+        
+        if email is None or token_type != "reset_password":
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid token")
+            
+    except JWTError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired token")
+
+    user = users_collection.find_one({"email": email})
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    hashed_password = get_password_hash(request.new_password)
+    users_collection.update_one(
+        {"email": email},
+        {"$set": {
+            "hashed_password": hashed_password, 
+            "updated_at": datetime.utcnow()
+        }}
+    )
+
+    return {"message": "Password reset successfully"}
 
 @router.get("/me", response_model=UserResponse)
 def get_me(current_user: dict = Depends(get_current_user)):
