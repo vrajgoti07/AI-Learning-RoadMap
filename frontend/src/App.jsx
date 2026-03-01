@@ -11,6 +11,8 @@ import Dashboard from './pages/Dashboard';
 import RoadmapDetail from './pages/RoadmapDetail';
 import Login from './pages/Login';
 import SignUp from './pages/SignUp';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import Settings from './pages/Settings';
 import NotFound from './pages/NotFound';
 import Pricing from './pages/Pricing';
@@ -27,6 +29,8 @@ function App() {
             <Route path="/" element={<Home />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<SignUp />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/pricing" element={<Pricing />} />
 
             {/* Dashboard & Protected Routes wrapped in DashboardLayout */}

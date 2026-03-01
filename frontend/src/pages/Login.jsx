@@ -68,9 +68,9 @@ export default function Login() {
                             <input type="checkbox" className="form-checkbox bg-background border-white/10 rounded text-indigo-500 focus:ring-0 focus:ring-offset-0 w-4 h-4 transition-colors group-hover:border-indigo-400" />
                             <span className="text-sm text-slate-400 group-hover:text-slate-300 transition-colors">Remember me</span>
                         </label>
-                        <a href="#" className="text-sm font-medium text-cyan-400 hover:text-cyan-300 transition-colors">
+                        <Link to="/forgot-password" className="text-sm font-medium text-cyan-400 hover:text-cyan-300 transition-colors">
                             Forgot password?
-                        </a>
+                        </Link>
                     </div>
 
                     <GradientButton
