@@ -11,7 +11,7 @@ from app.services.email import send_welcome_email
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
 @router.post("/signup", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-def signup(user: UserCreate, background_tasks: BackgroundTasks):
+async def signup(user: UserCreate, background_tasks: BackgroundTasks):
     existing_user = users_collection.find_one({"email": user.email})
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -31,9 +31,9 @@ def signup(user: UserCreate, background_tasks: BackgroundTasks):
     created_user = users_collection.find_one({"_id": result.inserted_id})
     created_user["_id"] = str(created_user["_id"])
     
-    # Send Welcome Email via FastAPI BackgroundTasks (Safe for sync routes)
-    background_tasks.add_task(send_welcome_email, created_user["email"], created_user["name"])
-
+    # Send welcome email in background
+    background_tasks.add_task(send_welcome_email, user.email, user.name)
+    
     return created_user
 
 @router.post("/login", response_model=Token)

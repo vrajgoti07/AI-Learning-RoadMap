@@ -9,17 +9,17 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "secret"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
-    
-    # Email Settings
-    SMTP_HOST: str = "smtp.gmail.com"
-    SMTP_PORT: int = 587
-    SMTP_USERNAME: str = ""
-    SMTP_PASSWORD: str = ""
-    FROM_EMAIL: str = "noreply@pathfinder.ai"
-    FROM_NAME: str = "PathFinder AI"
 
     # AI & External APIs
     GEMINI_API_KEY: str = ""
     YOUTUBE_API_KEY: str = ""
+
+    # Email Settings
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 465
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    EMAILS_FROM_EMAIL: str = ""
+    EMAILS_FROM_NAME: str = "AI Learning Roadmap"
 
 settings = Settings()
