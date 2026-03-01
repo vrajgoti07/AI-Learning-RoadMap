@@ -1,0 +1,14 @@
+<svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <!-- Distinct, Minimalist Favicon Logo (Abstract "A" and "I" lettermark) -->
+    <!-- Using only 2 colors: Bright White/Silver (#f8fafc) and Vibrant Fuchsia (#d946ef) -->
+    
+    <!-- Deep background glow for contrast -->
+    <rect width="100" height="100" rx="20" fill="#151226" />
+    
+    <!-- Bold Letter "A" (PathFinder AI) - Crisp Silver -->
+    <path d="M50 15 L20 85 h15 l8 -20 h14 l8 20 h15 L50 15 Z m-10 35 l10 -25 l10 25 h-20 Z" fill="#f8fafc" />
+    
+    <!-- Letter "I" slashing through or next to it - Glowing Fuchsia -->
+    <!-- Actually, let's make an abstract swoosh/slash for the "I" -->
+    <path d="M75 15 L85 15 L55 85 L45 85 Z" fill="#d946ef" opacity="0.9" />
+</svg>
