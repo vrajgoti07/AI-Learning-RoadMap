@@ -3,7 +3,20 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 const handleResponse = async (response) => {
     if (!response.ok) {
         const error = await response.json().catch(() => ({}));
-        throw new Error(error.detail || 'Something went wrong');
+        let errorMessage = 'Something went wrong';
+        
+        if (error.detail) {
+            if (Array.isArray(error.detail)) {
+                // Handle FastAPI validation errors (e.g., invalid email)
+                errorMessage = error.detail.map(err => err.msg).join(', ');
+            } else if (typeof error.detail === 'string') {
+                errorMessage = error.detail;
+            } else {
+                errorMessage = JSON.stringify(error.detail);
+            }
+        }
+        
+        throw new Error(errorMessage);
     }
     return response.json();
 };

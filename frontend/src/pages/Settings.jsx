@@ -18,6 +18,7 @@ import {
 import GlassCard from '../components/GlassCard';
 import UpgradeModal from '../components/UpgradeModal';
 import { useAuth } from '../context/AuthContext';
+import { api } from '../utils/api';
 
 export default function Settings() {
     const { user, plan } = useAuth();
@@ -29,12 +30,64 @@ export default function Settings() {
     const [showNewPassword, setShowNewPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+    // Password change state
+    const [currentPassword, setCurrentPassword] = useState('');
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [passwordError, setPasswordError] = useState('');
+    const [passwordSuccess, setPasswordSuccess] = useState('');
+    const [isChangingPassword, setIsChangingPassword] = useState(false);
+
     const tabs = [
         { id: 'profile', label: 'Profile', icon: User },
         { id: 'plan', label: 'Billing & Plan', icon: CreditCard },
         { id: 'notifications', label: 'Notifications', icon: Bell },
         { id: 'security', label: 'Security', icon: Shield }
     ];
+
+    const handlePasswordChange = async (e) => {
+        e.preventDefault();
+        setPasswordError('');
+        setPasswordSuccess('');
+
+        // Validation
+        if (!currentPassword || !newPassword || !confirmPassword) {
+            setPasswordError('All fields are required');
+            return;
+        }
+
+        if (newPassword !== confirmPassword) {
+            setPasswordError('New passwords do not match');
+            return;
+        }
+
+        if (newPassword.length < 6) {
+            setPasswordError('New password must be at least 6 characters');
+            return;
+        }
+
+        setIsChangingPassword(true);
+
+        try {
+            await api.put('/users/change-password', {
+                current_password: currentPassword,
+                new_password: newPassword
+            });
+
+            setPasswordSuccess('Password updated successfully!');
+            // Clear form
+            setCurrentPassword('');
+            setNewPassword('');
+            setConfirmPassword('');
+            
+            // Clear success message after 3 seconds
+            setTimeout(() => setPasswordSuccess(''), 3000);
+        } catch (error) {
+            setPasswordError(error.message || 'Failed to update password');
+        } finally {
+            setIsChangingPassword(false);
+        }
+    };
 
     const renderTabContent = () => {
         switch (activeTab) {
@@ -145,8 +198,22 @@ export default function Settings() {
                 return (
                     <div className="space-y-10 animate-fade-in max-w-xl">
                         {/* Password Reset Section */}
-                        <div className="space-y-6">
+                        <form onSubmit={handlePasswordChange} className="space-y-6">
                             <h3 className="text-sm font-black text-white uppercase tracking-widest border-b border-white/5 pb-4">Change Password</h3>
+
+                            {/* Error Message */}
+                            {passwordError && (
+                                <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl">
+                                    <p className="text-xs font-bold text-red-400">{passwordError}</p>
+                                </div>
+                            )}
+
+                            {/* Success Message */}
+                            {passwordSuccess && (
+                                <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl">
+                                    <p className="text-xs font-bold text-emerald-400">{passwordSuccess}</p>
+                                </div>
+                            )}
 
                             <div className="space-y-2">
                                 <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest px-1">Current Password</label>
@@ -154,7 +221,10 @@ export default function Settings() {
                                     <input
                                         type={showCurrentPassword ? "text" : "password"}
                                         placeholder="••••••••"
+                                        value={currentPassword}
+                                        onChange={(e) => setCurrentPassword(e.target.value)}
                                         className="w-full bg-slate-900/50 backdrop-blur-sm border border-white/10 rounded-2xl px-5 py-4 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/40 pr-12 transition-all"
+                                        required
                                     />
                                     <button
                                         type="button"
@@ -173,7 +243,10 @@ export default function Settings() {
                                         <input
                                             type={showNewPassword ? "text" : "password"}
                                             placeholder="••••••••"
+                                            value={newPassword}
+                                            onChange={(e) => setNewPassword(e.target.value)}
                                             className="w-full bg-slate-900/50 backdrop-blur-sm border border-white/10 rounded-2xl px-5 py-4 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/40 pr-12 transition-all"
+                                            required
                                         />
                                         <button
                                             type="button"
@@ -190,7 +263,10 @@ export default function Settings() {
                                         <input
                                             type={showConfirmPassword ? "text" : "password"}
                                             placeholder="••••••••"
+                                            value={confirmPassword}
+                                            onChange={(e) => setConfirmPassword(e.target.value)}
                                             className="w-full bg-slate-900/50 backdrop-blur-sm border border-white/10 rounded-2xl px-5 py-4 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/40 pr-12 transition-all"
+                                            required
                                         />
                                         <button
                                             type="button"
@@ -204,11 +280,15 @@ export default function Settings() {
                             </div>
 
                             <div className="flex justify-end pt-2">
-                                <button className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-8 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-indigo-500/20 transition-all">
-                                    Update Password
+                                <button 
+                                    type="submit"
+                                    disabled={isChangingPassword}
+                                    className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-8 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-indigo-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {isChangingPassword ? 'Updating...' : 'Update Password'}
                                 </button>
                             </div>
-                        </div>
+                        </form>
 
                         {/* Danger Zone */}
                         <div className="pt-8 border-t border-white/5 space-y-6">
