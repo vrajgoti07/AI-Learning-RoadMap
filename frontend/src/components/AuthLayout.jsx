@@ -2,7 +2,7 @@ import React from 'react';
 import { BrainCircuit, Target, Zap } from 'lucide-react';
 import Logo from './Logo';
 
-export default function AuthLayout({ children }) {
+export default function AuthLayout({ children, title, subtitle, features }) {
     return (
         <div className="min-h-screen bg-background flex flex-col md:flex-row overflow-hidden">
             {/* LEFT SECTION - Brand Panel */}
@@ -22,42 +22,63 @@ export default function AuthLayout({ children }) {
                     </div>
 
                     <h1 className="text-4xl lg:text-5xl font-bold mb-6 tracking-tight leading-tight">
-                        Accelerate Your <br />
-                        <span className="gradient-text">Learning Journey</span>
+                        {title || (
+                            <>
+                                Accelerate Your <br />
+                                <span className="gradient-text">Learning Journey</span>
+                            </>
+                        )}
                     </h1>
 
                     <p className="text-slate-400 text-lg mb-12 leading-relaxed">
-                        Join thousands of developers using our AI-driven roadmaps to reach their career milestones faster.
+                        {subtitle || "Join thousands of developers using our AI-driven roadmaps to reach their career milestones faster."}
                     </p>
 
                     <div className="space-y-8">
-                        <div className="flex items-start">
-                            <div className="w-12 h-12 rounded-xl bg-indigo-500/10 flex items-center justify-center shrink-0 mr-4 border border-indigo-500/20">
-                                <BrainCircuit className="w-6 h-6 text-indigo-400" />
-                            </div>
-                            <div>
-                                <h3 className="text-white font-medium mb-1">Smart Customization</h3>
-                                <p className="text-slate-400 text-sm leading-relaxed">AI analyzes your skills to build the optimal curriculum.</p>
-                            </div>
-                        </div>
-                        <div className="flex items-start">
-                            <div className="w-12 h-12 rounded-xl bg-cyan-500/10 flex items-center justify-center shrink-0 mr-4 border border-cyan-500/20">
-                                <Target className="w-6 h-6 text-cyan-400" />
-                            </div>
-                            <div>
-                                <h3 className="text-white font-medium mb-1">Clear Milestones</h3>
-                                <p className="text-slate-400 text-sm leading-relaxed">Track progress with exact objectives and timeline phases.</p>
-                            </div>
-                        </div>
-                        <div className="flex items-start">
-                            <div className="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center shrink-0 mr-4 border border-purple-500/20">
-                                <Zap className="w-6 h-6 text-purple-400" />
-                            </div>
-                            <div>
-                                <h3 className="text-white font-medium mb-1">Actionable Resources</h3>
-                                <p className="text-slate-400 text-sm leading-relaxed">Filter signal from noise with curated YouTube courses.</p>
-                            </div>
-                        </div>
+                        {(features || [
+                            {
+                                icon: BrainCircuit,
+                                color: "indigo",
+                                title: "Smart Customization",
+                                desc: "AI analyzes your skills to build the optimal curriculum."
+                            },
+                            {
+                                icon: Target,
+                                color: "cyan",
+                                title: "Clear Milestones",
+                                desc: "Track progress with exact objectives and timeline phases."
+                            },
+                            {
+                                icon: Zap,
+                                color: "purple",
+                                title: "Actionable Resources",
+                                desc: "Filter signal from noise with curated YouTube courses."
+                            }
+                        ]).map((feature, idx) => {
+                            const Icon = feature.icon;
+                            // Simplify color mapping for dynamic rendering
+                            const colorClasses = {
+                                indigo: "bg-indigo-500/10 border-indigo-500/20 text-indigo-400",
+                                cyan: "bg-cyan-500/10 border-cyan-500/20 text-cyan-400",
+                                purple: "bg-purple-500/10 border-purple-500/20 text-purple-400",
+                                emerald: "bg-emerald-500/10 border-emerald-500/20 text-emerald-400",
+                                rose: "bg-rose-500/10 border-rose-500/20 text-rose-400",
+                            };
+
+                            const classes = colorClasses[feature.color] || colorClasses.indigo;
+
+                            return (
+                                <div key={idx} className="flex items-start">
+                                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 mr-4 border ${classes.split(' ')[0]} ${classes.split(' ')[1]}`}>
+                                        <Icon className={`w-6 h-6 ${classes.split(' ')[2]}`} />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-white font-medium mb-1">{feature.title}</h3>
+                                        <p className="text-slate-400 text-sm leading-relaxed">{feature.desc}</p>
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
             </div>

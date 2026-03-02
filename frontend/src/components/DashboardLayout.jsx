@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Sidebar from './Sidebar';
 import { useLocation } from 'react-router-dom';
 import { Menu, Search, Bell } from 'lucide-react';
@@ -9,6 +9,47 @@ export default function DashboardLayout({ children }) {
     const location = useLocation();
     const { user } = useAuth();
     const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+    const [hasUnread, setHasUnread] = useState(false);
+
+    // WebSocket logic for real-time notifications
+    useEffect(() => {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        // Adjust host if VITE_API_URL is set, otherwise use current host
+        const apiHost = import.meta.env.VITE_API_URL
+            ? new URL(import.meta.env.VITE_API_URL).host
+            : 'localhost:8000';
+
+        const wsUrl = `${protocol}//${apiHost}/ws/notifications?token=${token}`;
+        const socket = new WebSocket(wsUrl);
+
+        socket.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                if (data.type === 'notification') {
+                    setHasUnread(true);
+                }
+            } catch (err) {
+                console.error("WebSocket message error:", err);
+            }
+        };
+
+        socket.onclose = () => {
+            console.log("WebSocket disconnected. Attempting to reconnect in 5s...");
+            // Simple reconnect logic could go here
+        };
+
+        return () => socket.close();
+    }, [user]);
+
+    // Clear unread dot when opening dropdown
+    useEffect(() => {
+        if (isNotificationOpen) {
+            setHasUnread(false);
+        }
+    }, [isNotificationOpen]);
 
     // Map path to title
     const getTitle = () => {
@@ -56,7 +97,9 @@ export default function DashboardLayout({ children }) {
                                 className={`relative p-2 rounded-xl transition-all ${isNotificationOpen ? 'bg-indigo-500/10 text-indigo-400' : 'text-slate-500 hover:text-white hover:bg-white/5'}`}
                             >
                                 <Bell className="w-5 h-5" />
-                                <span className="absolute top-2 right-2 w-2 h-2 bg-indigo-400 rounded-full border-2 border-[#0B0914]" />
+                                {hasUnread && (
+                                    <span className="absolute top-2 right-2 w-2 h-2 bg-indigo-400 rounded-full border-2 border-[#0B0914] animate-pulse" />
+                                )}
                             </button>
 
                             <NotificationDropdown

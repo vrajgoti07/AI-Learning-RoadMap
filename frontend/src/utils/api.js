@@ -1,10 +1,56 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+let base_url = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+if (base_url.endsWith('8000')) {
+    base_url = `${base_url}/api`;
+} else if (!base_url.includes('/api')) {
+    base_url = `${base_url}/api`;
+}
+const API_URL = base_url;
 
-const handleResponse = async (response) => {
+const handleResponse = async (response, originalRequest = null) => {
     if (!response.ok) {
+        if (response.status === 401 && originalRequest) {
+            // Attempt to refresh the token
+            const refreshToken = localStorage.getItem('refresh_token');
+            if (refreshToken) {
+                try {
+                    const refreshResponse = await fetch(`${API_URL}/auth/refresh`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ refresh_token: refreshToken })
+                    });
+
+                    if (refreshResponse.ok) {
+                        const newTokens = await refreshResponse.json();
+                        localStorage.setItem('token', newTokens.access_token);
+                        localStorage.setItem('refresh_token', newTokens.refresh_token);
+
+                        // Retry original request with new token
+                        originalRequest.headers['Authorization'] = `Bearer ${newTokens.access_token}`;
+                        const retryResponse = await fetch(originalRequest.url, originalRequest.options);
+                        if (retryResponse.ok) {
+                            return retryResponse.json();
+                        }
+                    } else {
+                        // Refresh token is expired or invalid, log out
+                        localStorage.removeItem('token');
+                        localStorage.removeItem('refresh_token');
+                        window.location.href = '/login';
+                    }
+                } catch (err) {
+                    console.error('Failed to refresh token', err);
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('refresh_token');
+                    window.location.href = '/login';
+                }
+            } else {
+                localStorage.removeItem('token');
+                window.location.href = '/login';
+            }
+        }
+
         const error = await response.json().catch(() => ({}));
         let errorMessage = 'Something went wrong';
-        
+
         if (error.detail) {
             if (Array.isArray(error.detail)) {
                 // Handle FastAPI validation errors (e.g., invalid email)
@@ -15,7 +61,7 @@ const handleResponse = async (response) => {
                 errorMessage = JSON.stringify(error.detail);
             }
         }
-        
+
         throw new Error(errorMessage);
     }
     return response.json();
@@ -27,8 +73,11 @@ export const api = {
         const headers = { 'Content-Type': 'application/json' };
         if (token) headers['Authorization'] = `Bearer ${token}`;
 
-        const response = await fetch(`${API_URL}${endpoint}`, { headers });
-        return handleResponse(response);
+        const options = { headers };
+        const url = `${API_URL}${endpoint}`;
+
+        const response = await fetch(url, options);
+        return handleResponse(response, { url, options, headers });
     },
 
     async post(endpoint, data) {
@@ -36,12 +85,15 @@ export const api = {
         const headers = { 'Content-Type': 'application/json' };
         if (token) headers['Authorization'] = `Bearer ${token}`;
 
-        const response = await fetch(`${API_URL}${endpoint}`, {
+        const options = {
             method: 'POST',
             headers,
             body: JSON.stringify(data),
-        });
-        return handleResponse(response);
+        };
+        const url = `${API_URL}${endpoint}`;
+
+        const response = await fetch(url, options);
+        return handleResponse(response, { url, options, headers });
     },
 
     async postFormUrlEncoded(endpoint, data) {
@@ -52,12 +104,15 @@ export const api = {
 
         const formBody = new URLSearchParams(data).toString();
 
-        const response = await fetch(`${API_URL}${endpoint}`, {
+        const options = {
             method: 'POST',
             headers,
             body: formBody,
-        });
-        return handleResponse(response);
+        };
+        const url = `${API_URL}${endpoint}`;
+
+        const response = await fetch(url, options);
+        return handleResponse(response, { url, options, headers });
     },
 
     async put(endpoint, data) {
@@ -65,12 +120,15 @@ export const api = {
         const headers = { 'Content-Type': 'application/json' };
         if (token) headers['Authorization'] = `Bearer ${token}`;
 
-        const response = await fetch(`${API_URL}${endpoint}`, {
+        const options = {
             method: 'PUT',
             headers,
             body: JSON.stringify(data),
-        });
-        return handleResponse(response);
+        };
+        const url = `${API_URL}${endpoint}`;
+
+        const response = await fetch(url, options);
+        return handleResponse(response, { url, options, headers });
     },
 
     async delete(endpoint) {
@@ -78,10 +136,13 @@ export const api = {
         const headers = { 'Content-Type': 'application/json' };
         if (token) headers['Authorization'] = `Bearer ${token}`;
 
-        const response = await fetch(`${API_URL}${endpoint}`, {
+        const options = {
             method: 'DELETE',
             headers,
-        });
-        return handleResponse(response);
+        };
+        const url = `${API_URL}${endpoint}`;
+
+        const response = await fetch(url, options);
+        return handleResponse(response, { url, options, headers });
     }
 };

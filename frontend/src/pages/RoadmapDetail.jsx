@@ -52,6 +52,18 @@ export default function RoadmapDetail() {
         alert("Exporting your roadmap as PDF... (Simulation)");
     };
 
+    const handleToggleComplete = async (nodeId, currentStatus) => {
+        try {
+            const response = await api.patch(`/roadmaps/${id}/progress`, {
+                node_id: nodeId,
+                is_completed: !currentStatus
+            });
+            setRoadmap(response);
+        } catch (err) {
+            console.error("Failed to update progress", err);
+        }
+    };
+
     if (loading) {
         return (
             <div className="flex items-center justify-center min-h-[60vh]">
@@ -84,6 +96,11 @@ export default function RoadmapDetail() {
         }
         return acc;
     }, []) || [];
+
+    // Calculate Progress Percentage
+    const completedNodes = roadmap.completed_nodes || [];
+    const totalNodesCount = displayNodes.length || 1;
+    const progressPercentage = Math.round((completedNodes.length / totalNodesCount) * 100);
 
     return (
         <div className="animate-fade-in pb-20">
@@ -137,18 +154,24 @@ export default function RoadmapDetail() {
                     <div>
                         <div className="flex items-center justify-between mb-8">
                             <h2 className="text-xl font-black text-white uppercase tracking-tight">Learning Sequence</h2>
-                            <span className="text-[10px] font-black text-cyan-400 bg-cyan-400/5 px-4 py-1.5 rounded-full border border-cyan-400/10 uppercase tracking-[0.2em]">42% Mastery</span>
+                            <span className="text-[10px] font-black text-cyan-400 bg-cyan-400/5 px-4 py-1.5 rounded-full border border-cyan-400/10 uppercase tracking-[0.2em]">{progressPercentage}% Mastery</span>
                         </div>
                         <Timeline
                             milestones={[...(displayNodes.length > 0 ? displayNodes.map((m) => m.milestones[0]) : []), "Final Launch"]}
-                            completedIndex={1}
+                            completedIndex={Math.round((completedNodes.length / totalNodesCount) * displayNodes.length)}
                         />
                     </div>
 
                     {/* Modules */}
                     <div className="space-y-6">
                         {displayNodes.map((phase, idx) => (
-                            <RoadmapCard key={idx} index={idx} {...phase} />
+                            <RoadmapCard
+                                key={idx}
+                                index={idx}
+                                {...phase}
+                                isCompleted={completedNodes.includes(phase.id)}
+                                onToggleComplete={handleToggleComplete}
+                            />
                         ))}
                     </div>
                 </div>

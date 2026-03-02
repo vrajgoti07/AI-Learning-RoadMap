@@ -73,8 +73,31 @@ export default function ResetPassword() {
         }
     };
 
+    const customFeatures = [
+        {
+            icon: Lock,
+            color: "emerald",
+            title: "Bank-Grade Security",
+            desc: "Your new password is encrypted immediately before storing."
+        },
+        {
+            icon: ArrowRight,
+            color: "cyan",
+            title: "Instant Access",
+            desc: "Once reset, you'll be redirected instantly to log back into your learning journey."
+        }
+    ];
+
     return (
-        <AuthLayout>
+        <AuthLayout
+            title={
+                <>
+                    Secure <span className="gradient-text">Reset</span>
+                </>
+            }
+            subtitle="Choose a strong, unique password to protect your learning progress."
+            features={customFeatures}
+        >
             <div className="glass-card p-8 sm:p-10 rounded-[2rem] border border-white/10 shadow-2xl relative z-10 w-full backdrop-blur-xl">
                 <div className="text-center mb-8">
                     <h2 className="text-3xl font-bold text-white mb-2 tracking-tight">Create New Password</h2>

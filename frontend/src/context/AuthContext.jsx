@@ -42,6 +42,9 @@ export function AuthProvider({ children }) {
             // Using our JSON endpoint instead of standard x-www-form-urlencoded
             const response = await api.post('/auth/login-json', { email, password });
             localStorage.setItem('token', response.access_token);
+            if (response.refresh_token) {
+                localStorage.setItem('refresh_token', response.refresh_token);
+            }
             await fetchUser(); // Hydrate user state
             return true;
         } catch (error) {
@@ -50,10 +53,29 @@ export function AuthProvider({ children }) {
         }
     };
 
+    const googleLogin = async (credentialOrToken, isAccessToken = false) => {
+        try {
+            const body = isAccessToken
+                ? { access_token: credentialOrToken }
+                : { credential: credentialOrToken };
+            const response = await api.post('/auth/google', body);
+            localStorage.setItem('token', response.access_token);
+            if (response.refresh_token) {
+                localStorage.setItem('refresh_token', response.refresh_token);
+            }
+            await fetchUser();
+            return true;
+        } catch (error) {
+            console.error("Google Auth failed:", error);
+            throw error;
+        }
+    };
+
     const logout = () => {
         setUser(null);
         setPlan('GO');
         localStorage.removeItem('token');
+        localStorage.removeItem('refresh_token');
     };
 
     const upgradePlan = async (newPlan) => {
@@ -70,7 +92,7 @@ export function AuthProvider({ children }) {
     };
 
     return (
-        <AuthContext.Provider value={{ user, login, signup, logout, plan, upgradePlan, loading }}>
+        <AuthContext.Provider value={{ user, login, googleLogin, signup, logout, plan, upgradePlan, loading }}>
             {children}
         </AuthContext.Provider>
     );

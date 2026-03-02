@@ -1,9 +1,32 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Github, Twitter, Linkedin, Mail, ArrowRight } from 'lucide-react';
+import { Github, Twitter, Linkedin, Mail, ArrowRight, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import Logo from './Logo';
+import { api } from '../utils/api';
 
 export default function Footer() {
+    const [email, setEmail] = useState('');
+    const [status, setStatus] = useState('idle'); // idle, loading, success, error
+    const [message, setMessage] = useState('');
+
+    const handleSubscribe = async (e) => {
+        e.preventDefault();
+        if (!email) return;
+
+        setStatus('loading');
+        try {
+            const result = await api.post('/newsletter/subscribe', { email });
+            setStatus('success');
+            setMessage(result.message || 'Subscribed successfully!');
+            setEmail('');
+            setTimeout(() => setStatus('idle'), 5000);
+        } catch (error) {
+            setStatus('error');
+            setMessage(error.message || 'Something went wrong. Please try again.');
+            setTimeout(() => setStatus('idle'), 5000);
+        }
+    };
+
     return (
         <footer className="relative border-t border-white/10 bg-[#0B0914] pt-20 pb-10 overflow-hidden mt-10">
             {/* Background Glow */}
@@ -66,20 +89,43 @@ export default function Footer() {
                         <p className="text-sm text-slate-400 font-bold mb-4">
                             Subscribe to our newsletter for the latest AI learning strategies.
                         </p>
-                        <form className="relative group">
+                        <form onSubmit={handleSubscribe} className="relative group">
                             <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
                             <input
                                 type="email"
                                 placeholder="Enter your email"
-                                className="w-full bg-white/5 border border-white/10 rounded-2xl pl-11 pr-12 py-3.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all font-bold"
+                                required
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                disabled={status === 'loading'}
+                                className="w-full bg-white/5 border border-white/10 rounded-2xl pl-11 pr-12 py-3.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all font-bold disabled:opacity-50"
                             />
                             <button
-                                type="button"
-                                className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-indigo-500 rounded-xl flex items-center justify-center text-white hover:bg-indigo-400 hover:scale-105 transition-all shadow-lg shadow-indigo-500/20"
+                                type="submit"
+                                disabled={status === 'loading' || !email}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-indigo-500 rounded-xl flex items-center justify-center text-white hover:bg-indigo-400 hover:scale-105 transition-all shadow-lg shadow-indigo-500/20 disabled:opacity-50 disabled:hover:scale-100"
                             >
-                                <ArrowRight className="w-4 h-4" />
+                                {status === 'loading' ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                    <ArrowRight className="w-4 h-4" />
+                                )}
                             </button>
                         </form>
+
+                        {status === 'success' && (
+                            <div className="mt-3 flex items-center space-x-2 text-emerald-400 text-xs font-bold animate-in fade-in slide-in-from-top-1">
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                <span>{message}</span>
+                            </div>
+                        )}
+
+                        {status === 'error' && (
+                            <div className="mt-3 flex items-center space-x-2 text-rose-400 text-xs font-bold animate-in fade-in slide-in-from-top-1">
+                                <AlertCircle className="w-3.5 h-3.5" />
+                                <span>{message}</span>
+                            </div>
+                        )}
                     </div>
                 </div>
 
