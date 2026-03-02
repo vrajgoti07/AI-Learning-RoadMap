@@ -16,7 +16,7 @@ def generate_roadmap_json(topic):
     }
 
     model = genai.GenerativeModel(
-        model_name='gemini-1.5-flash',
+        model_name='gemini-1.5-flash-latest',
         generation_config={
             "temperature": 0.2,
             "top_p": 0.8,

@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes import auth, users, roadmaps, admin, notifications
+from app.routes import auth, users, roadmaps, admin, notifications, subscriptions, websocket, newsletter
 from app.database.connection import client
 
 app = FastAPI(title="PathFinder AI API", version="1.0.0")
@@ -19,8 +19,11 @@ app.include_router(auth.router, prefix="/api")
 app.include_router(users.router, prefix="/api")
 app.include_router(admin.users_router, prefix="/api")
 app.include_router(roadmaps.router, prefix="/api")
+app.include_router(subscriptions.router, prefix="/api")
+app.include_router(websocket.router)
 app.include_router(admin.router, prefix="/api")
 app.include_router(notifications.router, prefix="/api")
+app.include_router(newsletter.router, prefix="/api")
 
 @app.get("/")
 def read_root():

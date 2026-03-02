@@ -17,13 +17,31 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         user_id: str = payload.get("sub")
-        if user_id is None:
+        token_type: str = payload.get("type")
+        if user_id is None or token_type != "access":
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+        
+    return user_id # return ID instead since doing async depend in FastAPI requires more boilerplate, we'll fetch explicitly
+    
+async def get_current_user_object(token: str = Depends(oauth2_scheme)):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        user_id: str = payload.get("sub")
+        token_type: str = payload.get("type")
+        if user_id is None or token_type != "access":
             raise credentials_exception
     except JWTError:
         raise credentials_exception
         
     try:
-        user = users_collection.find_one({"_id": ObjectId(user_id)})
+        user = await users_collection.find_one({"_id": ObjectId(user_id)})
     except Exception:
         raise credentials_exception
 
@@ -33,7 +51,7 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
     user["_id"] = str(user["_id"])
     return user
 
-def get_current_admin(current_user: dict = Depends(get_current_user)):
+async def get_current_admin(current_user: dict = Depends(get_current_user_object)):
     if current_user.get("role") != "ADMIN":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

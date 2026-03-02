@@ -1,20 +1,28 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
+from pydantic import BaseModel
 from typing import List
 from bson import ObjectId
 from datetime import datetime
 from app.schemas.user import UserResponse
 from app.core.deps import get_current_admin
 from app.database.connection import users_collection, roadmaps_collection
+from app.services.activity_log_service import activity_logs_collection
+from app.schemas.activity_log import ActivityLogResponse
+from app.services.email import send_newsletter_bulk
+
+class NewsletterBlastRequest(BaseModel):
+    subject: str
+    content: str
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 users_router = APIRouter(prefix="/users", tags=["Admin User Management"])
 
 # Admin Analytics
 @router.get("/stats")
-def get_admin_stats(current_admin: dict = Depends(get_current_admin)):
-    total_users = users_collection.count_documents({})
-    total_roadmaps = roadmaps_collection.count_documents({})
-    pro_users = users_collection.count_documents({"plan": {"$in": ["PRO", "PLUS", "PRO PLUS"]}})
+async def get_admin_stats(current_admin: dict = Depends(get_current_admin)):
+    total_users = await users_collection.count_documents({})
+    total_roadmaps = await roadmaps_collection.count_documents({})
+    pro_users = await users_collection.count_documents({"plan": {"$in": ["PRO", "PLUS", "PRO PLUS"]}})
     
     return {
         "total_users": total_users,
@@ -23,15 +31,15 @@ def get_admin_stats(current_admin: dict = Depends(get_current_admin)):
     }
 
 @router.get("/plan-distribution")
-def get_plan_distribution(current_admin: dict = Depends(get_current_admin)):
+async def get_plan_distribution(current_admin: dict = Depends(get_current_admin)):
     pipeline = [
         {"$group": {"_id": "$plan", "count": {"$sum": 1}}}
     ]
-    distribution = list(users_collection.aggregate(pipeline))
+    distribution = await users_collection.aggregate(pipeline).to_list(length=None)
     return [{"plan": d["_id"], "count": d["count"]} for d in distribution]
 
 @router.get("/roadmap-trends")
-def get_roadmap_trends(current_admin: dict = Depends(get_current_admin)):
+async def get_roadmap_trends(current_admin: dict = Depends(get_current_admin)):
     # Simplified aggregate for the example
     pipeline = [
         {"$group": {
@@ -41,13 +49,13 @@ def get_roadmap_trends(current_admin: dict = Depends(get_current_admin)):
         {"$sort": {"_id": 1}},
         {"$limit": 7}
     ]
-    trends = list(roadmaps_collection.aggregate(pipeline))
+    trends = await roadmaps_collection.aggregate(pipeline).to_list(length=None)
     return [{"date": d["_id"], "count": d["count"]} for d in trends]
 
 @router.get("/recent-activity")
-def get_recent_activity(current_admin: dict = Depends(get_current_admin)):
-    recent_users = list(users_collection.find().sort("created_at", -1).limit(5))
-    recent_roadmaps = list(roadmaps_collection.find().sort("created_at", -1).limit(5))
+async def get_recent_activity(current_admin: dict = Depends(get_current_admin)):
+    recent_users = await users_collection.find().sort("created_at", -1).limit(5).to_list(length=None)
+    recent_roadmaps = await roadmaps_collection.find().sort("created_at", -1).limit(5).to_list(length=None)
     
     activity = []
     
@@ -64,7 +72,7 @@ def get_recent_activity(current_admin: dict = Depends(get_current_admin)):
             
     for r in recent_roadmaps:
         if "created_at" in r and r["created_at"]:
-            user = users_collection.find_one({"_id": r.get("user_id")})
+            user = await users_collection.find_one({"_id": r.get("user_id")})
             username = user.get("name") if user else "A User"
             action_text = f"Generated {r.get('topic', 'AI')} Path"
             
@@ -80,20 +88,30 @@ def get_recent_activity(current_admin: dict = Depends(get_current_admin)):
     activity.sort(key=lambda x: x["timestamp"], reverse=True)
     return activity[:5]
 
+@router.get("/activity-logs", response_model=List[ActivityLogResponse])
+async def get_activity_logs(
+    limit: int = 50, 
+    current_admin: dict = Depends(get_current_admin)
+):
+    cursor = activity_logs_collection.find().sort("created_at", -1).limit(limit)
+    logs = await cursor.to_list(length=None)
+    for log in logs:
+        log["id"] = str(log["_id"])
+    return logs
+
 # User Management (Admin Only)
 @users_router.get("", response_model=List[UserResponse])
-def get_all_users(current_admin: dict = Depends(get_current_admin)):
+async def get_all_users(current_admin: dict = Depends(get_current_admin)):
     cursor = users_collection.find().limit(100)
-    users = []
-    for user in cursor:
+    users = await cursor.to_list(length=None)
+    for user in users:
         user["_id"] = str(user["_id"])
-        users.append(user)
     return users
 
 @users_router.put("/{id}/promote")
-def promote_user(id: str, current_admin: dict = Depends(get_current_admin)):
+async def promote_user(id: str, current_admin: dict = Depends(get_current_admin)):
     try:
-        users_collection.update_one(
+        await users_collection.update_one(
             {"_id": ObjectId(id)},
             {"$set": {"role": "ADMIN"}}
         )
@@ -102,12 +120,25 @@ def promote_user(id: str, current_admin: dict = Depends(get_current_admin)):
         raise HTTPException(status_code=400, detail="Invalid user ID")
 
 @users_router.put("/{id}/ban")
-def ban_user(id: str, current_admin: dict = Depends(get_current_admin)):
+async def ban_user(id: str, current_admin: dict = Depends(get_current_admin)):
     try:
-        users_collection.update_one(
+        await users_collection.update_one(
             {"_id": ObjectId(id)},
             {"$set": {"role": "BANNED"}}
         )
         return {"status": "success", "message": "User has been banned"}
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid user ID")
+@router.post("/newsletter/send")
+async def send_newsletter_blast(
+    request: NewsletterBlastRequest, 
+    background_tasks: BackgroundTasks,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """
+    Triggers a newsletter blast to all subscribers.
+    Executed in the background to avoid blocking the request.
+    """
+    background_tasks.add_task(send_newsletter_bulk, request.subject, request.content)
+    
+    return {"status": "success", "message": "Newsletter broadcast started in the background."}
