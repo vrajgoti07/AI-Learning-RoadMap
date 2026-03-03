@@ -43,7 +43,7 @@ def generate_roadmap_json(topic):
           "phase": "Foundations",
           "duration": "Estimated time (e.g., 2 Weeks, 1 Month)",
           "milestones": ["Specific Primitive 1", "Specific Architecture Concept 2", "Vital Engineering Skill 3"],
-          "projects": [{"name": "Industry-Grade Lab (e.g., Custom State Management Library)", "difficulty": "Beginner/Intermediate/Advanced"}]
+          "projects": [{{"name": "Industry-Grade Lab (e.g., Custom State Management Library)", "difficulty": "Beginner/Intermediate/Advanced"}}]
         }}
       ]
     }}

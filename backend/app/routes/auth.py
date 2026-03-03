@@ -35,7 +35,7 @@ class GoogleLoginRequest(BaseModel):
     access_token: str = None
 
 @router.post("/google", response_model=Token)
-async def google_auth(request: GoogleLoginRequest, req: Request):
+async def google_auth(request: GoogleLoginRequest, req: Request, background_tasks: BackgroundTasks):
     try:
         email = None
         name = None
@@ -80,6 +80,9 @@ async def google_auth(request: GoogleLoginRequest, req: Request):
             }
             result = await users_collection.insert_one(new_user)
             user = await users_collection.find_one({"_id": result.inserted_id})
+
+            # Send welcome email for NEW Google users
+            background_tasks.add_task(send_welcome_email, email, name)
         
         # Generate our own tokens
         access_token = create_access_token(data={"sub": str(user["_id"])})

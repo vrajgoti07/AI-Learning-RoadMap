@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from app.routes import auth, users, roadmaps, admin, notifications, subscriptions, websocket, newsletter
+from app.routes import auth, users, roadmaps, admin, notifications, subscriptions, websocket, newsletter, activity
 from app.services.inbound_email_service import poll_inbound_emails
 import os
 import asyncio
@@ -40,6 +40,7 @@ app.include_router(websocket.router)
 app.include_router(admin.router, prefix="/api")
 app.include_router(notifications.router, prefix="/api")
 app.include_router(newsletter.router, prefix="/api")
+app.include_router(activity.router, prefix="/api")
 
 @app.get("/")
 def read_root():
