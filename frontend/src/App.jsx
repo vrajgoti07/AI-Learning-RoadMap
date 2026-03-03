@@ -18,6 +18,7 @@ import NotFound from './pages/NotFound';
 import Pricing from './pages/Pricing';
 import Users from './pages/Users';
 import Help from './pages/Help';
+import Activity from './pages/Activity';
 
 function App() {
   return (
@@ -73,6 +74,13 @@ function App() {
               <ProtectedRoute>
                 <DashboardLayout>
                   <Help />
+                </DashboardLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/activity" element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <Activity />
                 </DashboardLayout>
               </ProtectedRoute>
             } />
