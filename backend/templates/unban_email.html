@@ -7,11 +7,12 @@
     <title>Account Status Update - PathFinder AI</title>
     <style>
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             background-color: #0b101e;
             color: #f8fafc;
             margin: 0;
             padding: 0;
+            -webkit-font-smoothing: antialiased;
         }
 
         .container {
@@ -33,18 +34,21 @@
         .header h1 {
             color: #ffffff;
             margin: 0;
-            font-size: 24px;
+            font-size: 26px;
             font-weight: 700;
+            letter-spacing: -0.5px;
         }
 
         .content {
             padding: 40px 30px;
+            background-color: #131a2a;
         }
 
         .content h2 {
             color: #f8fafc;
             font-size: 20px;
             margin-top: 0;
+            font-weight: 600;
         }
 
         .content p {
@@ -79,32 +83,60 @@
 
         .footer p {
             color: #64748b;
-            font-size: 12px;
+            font-size: 13px;
             margin: 5px 0;
+        }
+
+        .footer .brand {
+            font-weight: 600;
+            color: #cbd5e1;
+            margin-bottom: 10px;
+        }
+
+        @media only screen and (max-width: 600px) {
+            .container {
+                margin: 20px 10px;
+                width: auto;
+            }
+
+            .content {
+                padding: 30px 20px;
+            }
         }
     </style>
 </head>
 
 <body>
     <div class="container">
+        <!-- Header Section -->
         <div class="header">
             <img src="{{logo_url}}" alt="PathFinder AI Logo"
-                style="width: 60px; height: 60px; border-radius: 10px; margin-bottom: 15px; border: 1px solid rgba(255,255,255,0.1);">
+                style="width: 70px; height: 70px; border-radius: 12px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.1);">
             <h1>Welcome Back! ✨</h1>
         </div>
+
+        <!-- Main Content -->
         <div class="content">
             <h2>Hi {{name}},</h2>
             <p>We are happy to inform you that your <strong>PathFinder AI</strong> account has been reinstated.</p>
             <p>You can now log back into your dashboard, access your saved roadmaps, and continue your learning journey.
             </p>
+
             <div class="cta-button-container">
                 <a href="http://localhost:5173/dashboard" class="cta-button">Access Your Dashboard</a>
             </div>
+
             <p>We apologize for any inconvenience caused and appreciate your patience.</p>
-            <p>Best regards,<br>The PathFinder AI Team</p>
+            <p style="margin-bottom: 0px; margin-top: 30px;">Best regards,<br><strong>The PathFinder AI Team</strong>
+            </p>
         </div>
+
+        <!-- Footer Section -->
         <div class="footer">
-            <p>PathFinder AI &bull; Empowering Developers</p>
+            <p class="brand">PathFinder AI</p>
+            <p>Empowering the next generation of developers.</p>
+            <p style="margin-top: 20px; font-size: 11px; opacity: 0.6;">This is an automated message regarding your
+                account status.</p>
         </div>
     </div>
 </body>
