@@ -1,9 +1,19 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from app.routes import auth, users, roadmaps, admin, notifications, subscriptions, websocket, newsletter
-from app.database.connection import client
+from app.services.inbound_email_service import poll_inbound_emails
+import os
+import asyncio
 
 app = FastAPI(title="PathFinder AI API", version="1.0.0")
+
+# Ensure uploads directory exists
+UPLOAD_DIR = "uploads/profiles"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 # CORS middleware for React Frontend
 app.add_middleware(
@@ -20,6 +30,12 @@ app.include_router(users.router, prefix="/api")
 app.include_router(admin.users_router, prefix="/api")
 app.include_router(roadmaps.router, prefix="/api")
 app.include_router(subscriptions.router, prefix="/api")
+
+@app.on_event("startup")
+async def startup_event():
+    print("Starting background services...")
+    # Start the email poller in the background
+    asyncio.create_task(poll_inbound_emails())
 app.include_router(websocket.router)
 app.include_router(admin.router, prefix="/api")
 app.include_router(notifications.router, prefix="/api")

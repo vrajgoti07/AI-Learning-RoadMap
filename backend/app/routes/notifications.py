@@ -41,3 +41,10 @@ async def mark_as_read(id: str, current_user: dict = Depends(get_current_user_ob
         return {"status": "success", "message": "Notification marked as read"}
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid Notification ID")
+@router.put("/read-all")
+async def mark_all_as_read(current_user: dict = Depends(get_current_user_object)):
+    await notifications_collection.update_many(
+        {"user_id": current_user["_id"], "is_read": False},
+        {"$set": {"is_read": True}}
+    )
+    return {"status": "success", "message": "All notifications marked as read"}

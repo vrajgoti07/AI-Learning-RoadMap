@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     SMTP_PORT: int = 465
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
+    IMAP_HOST: str = "imap.gmail.com"
+    IMAP_PORT: int = 993
     EMAILS_FROM_EMAIL: str = ""
     EMAILS_FROM_NAME: str = "AI Learning Roadmap"
     

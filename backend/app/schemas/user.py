@@ -5,6 +5,7 @@ from datetime import datetime
 class UserBase(BaseModel):
     email: EmailStr
     name: str
+    bio: Optional[str] = None
 
 class UserCreate(UserBase):
     password: str
@@ -18,6 +19,8 @@ class UserResponse(UserBase):
     role: str
     plan: str
     theme_preference: str
+    profile_pic: Optional[str] = None
+    bio: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
@@ -37,3 +40,7 @@ class ThemeUpdateRequest(BaseModel):
 
 class PlanUpgradeRequest(BaseModel):
     plan: str
+
+class ProfileUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    bio: Optional[str] = None

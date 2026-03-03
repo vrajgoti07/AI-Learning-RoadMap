@@ -8,7 +8,8 @@ from app.core.deps import get_current_admin
 from app.database.connection import users_collection, roadmaps_collection
 from app.services.activity_log_service import activity_logs_collection
 from app.schemas.activity_log import ActivityLogResponse
-from app.services.email import send_newsletter_bulk
+from app.services.email import send_newsletter_bulk, send_ban_email, send_unban_email
+from app.services.notification_service import create_notification
 
 class NewsletterBlastRequest(BaseModel):
     subject: str
@@ -109,26 +110,104 @@ async def get_all_users(current_admin: dict = Depends(get_current_admin)):
     return users
 
 @users_router.put("/{id}/promote")
-async def promote_user(id: str, current_admin: dict = Depends(get_current_admin)):
+async def promote_user(id: str, background_tasks: BackgroundTasks, current_admin: dict = Depends(get_current_admin)):
     try:
+        user = await users_collection.find_one({"_id": ObjectId(id)})
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+            
         await users_collection.update_one(
             {"_id": ObjectId(id)},
             {"$set": {"role": "ADMIN"}}
         )
-        return {"status": "success", "message": "User promoted to ADMIN"}
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid user ID")
+        
+        # Trigger notification
+        await create_notification(
+            user_id=id,
+            message="Your account has been promoted to Admin!",
+            type="crown"
+        )
+        
+        return {"status": "success", "message": "User promoted to admin"}
+    except Exception as e:
+        if isinstance(e, HTTPException): raise e
+        raise HTTPException(status_code=400, detail="Invalid user ID or update failed")
+
+@users_router.put("/{id}/demote")
+async def demote_user(id: str, background_tasks: BackgroundTasks, current_admin: dict = Depends(get_current_admin)):
+    try:
+        user = await users_collection.find_one({"_id": ObjectId(id)})
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        await users_collection.update_one(
+            {"_id": ObjectId(id)},
+            {"$set": {"role": "USER"}}
+        )
+        # Trigger notification
+        await create_notification(
+            user_id=id,
+            message="Your admin privileges have been revoked.",
+            type="alert"
+        )
+        return {"status": "success", "message": "Admin privileges revoked"}
+    except Exception as e:
+        if isinstance(e, HTTPException): raise e
+        raise HTTPException(status_code=400, detail="Invalid user ID or update failed")
 
 @users_router.put("/{id}/ban")
-async def ban_user(id: str, current_admin: dict = Depends(get_current_admin)):
+async def ban_user(id: str, background_tasks: BackgroundTasks, current_admin: dict = Depends(get_current_admin)):
     try:
+        user = await users_collection.find_one({"_id": ObjectId(id)})
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+            
         await users_collection.update_one(
             {"_id": ObjectId(id)},
             {"$set": {"role": "BANNED"}}
         )
+        
+        # Trigger notification
+        await create_notification(
+            user_id=id,
+            message="Your account has been suspended for violating terms.",
+            type="alert"
+        )
+        
+        # Send notification email
+        background_tasks.add_task(send_ban_email, user["email"], user.get("name", user["email"]))
+        
         return {"status": "success", "message": "User has been banned"}
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid user ID")
+    except Exception as e:
+        if isinstance(e, HTTPException): raise e
+        raise HTTPException(status_code=400, detail="Invalid user ID or update failed")
+
+@users_router.put("/{id}/unban")
+async def unban_user(id: str, background_tasks: BackgroundTasks, current_admin: dict = Depends(get_current_admin)):
+    try:
+        user = await users_collection.find_one({"_id": ObjectId(id)})
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        await users_collection.update_one(
+            {"_id": ObjectId(id)},
+            {"$set": {"role": "USER"}}
+        )
+
+        # Trigger notification
+        await create_notification(
+            user_id=id,
+            message="Welcome back! Your account has been reinstated.",
+            type="zap"
+        )
+
+        # Send notification email
+        background_tasks.add_task(send_unban_email, user["email"], user.get("name", user["email"]))
+
+        return {"status": "success", "message": "User has been unbanned"}
+    except Exception as e:
+        if isinstance(e, HTTPException): raise e
+        raise HTTPException(status_code=400, detail="Invalid user ID or update failed")
 @router.post("/newsletter/send")
 async def send_newsletter_blast(
     request: NewsletterBlastRequest, 

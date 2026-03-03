@@ -6,7 +6,12 @@ from email.message import EmailMessage
 
 from app.core.config import settings
 
+from datetime import datetime
 
+
+# Base URL for static assets (logo, etc.)
+BASE_URL = "http://localhost:8000"
+LOGO_URL = f"{BASE_URL}/static/logo.png"
 
 async def send_welcome_email(email_to: str, name: str):
 
@@ -50,7 +55,7 @@ async def send_welcome_email(email_to: str, name: str):
 
             html_content = file.read()
 
-            html_content = html_content.replace("{{name}}", name)
+            html_content = html_content.replace("{{name}}", name).replace("{{logo_url}}", LOGO_URL)
 
     except Exception as e:
 
@@ -144,7 +149,7 @@ async def send_password_reset_email(email_to: str, name: str, otp: str = None):
 
             html_content = file.read()
 
-            html_content = html_content.replace("{{name}}", name).replace("{{otp}}", otp)
+            html_content = html_content.replace("{{name}}", name).replace("{{otp}}", otp).replace("{{logo_url}}", LOGO_URL)
 
     except Exception as e:
         print(f"Template not found, using fallback. Error: {e}")
@@ -234,7 +239,8 @@ async def send_newsletter_bulk(subject: str, content: str):
             # Prepare HTML content
             final_html = template_html.replace("{{subject}}", subject)\
                                      .replace("{{content}}", content)\
-                                     .replace("{{year}}", year)
+                                     .replace("{{year}}", year)\
+                                     .replace("{{logo_url}}", LOGO_URL)
 
             message.set_content(f"{subject}\n\n{content}")
             message.add_alternative(final_html, subtype="html")
@@ -251,5 +257,133 @@ async def send_newsletter_bulk(subject: str, content: str):
         print(f"SMTP Error during broadcast: {e}")
     
     return success_count
+async def send_ban_email(email_to: str, name: str):
+    """
+    Sends a ban notification email to the user.
+    """
+    if not settings.SMTP_USER or not settings.SMTP_PASSWORD:
+        print(f"SMTP not configured. Skipping ban email to {email_to}")
+        return
 
-from datetime import datetime
+    message = EmailMessage()
+    message["From"] = f"{settings.EMAILS_FROM_NAME} <{settings.EMAILS_FROM_EMAIL}>"
+    message["To"] = email_to
+    message["Subject"] = "Account Status Update - PathFinder AI"
+
+    template_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "templates", "ban_email.html")
+    try:
+        with open(template_path, "r", encoding="utf-8") as file:
+            html_content = file.read()
+            html_content = html_content.replace("{{name}}", name).replace("{{logo_url}}", LOGO_URL)
+    except Exception as e:
+        print(f"Ban template not found, using fallback. Error: {e}")
+        html_content = f"<html><body><h1>Account Suspension Notice</h1><p>Hi {name}, your account has been suspended.</p></body></html>"
+    
+    message.set_content(f"Hi {name},\nYour account has been suspended for violating our terms of service.")
+    message.add_alternative(html_content, subtype="html")
+
+    try:
+        smtp_client = aiosmtplib.SMTP(hostname=settings.SMTP_HOST, port=settings.SMTP_PORT, use_tls=True)
+        await smtp_client.connect()
+        await smtp_client.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+        await smtp_client.send_message(message)
+        await smtp_client.quit()
+        print(f"Ban email sent to {email_to}")
+    except Exception as e:
+        print(f"Failed to send ban email: {e}")
+
+async def send_unban_email(email_to: str, name: str):
+    """
+    Sends an unban notification email to the user.
+    """
+    if not settings.SMTP_USER or not settings.SMTP_PASSWORD:
+        print(f"SMTP not configured. Skipping unban email to {email_to}")
+        return
+
+    message = EmailMessage()
+    message["From"] = f"{settings.EMAILS_FROM_NAME} <{settings.EMAILS_FROM_EMAIL}>"
+    message["To"] = email_to
+    message["Subject"] = "Welcome Back! ✨ - PathFinder AI"
+
+    template_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "templates", "unban_email.html")
+    try:
+        with open(template_path, "r", encoding="utf-8") as file:
+            html_content = file.read()
+            html_content = html_content.replace("{{name}}", name).replace("{{logo_url}}", LOGO_URL)
+    except Exception as e:
+        print(f"Unban template not found, using fallback. Error: {e}")
+        html_content = f"<html><body><h1>Account Reinstated</h1><p>Hi {name}, your account has been reinstated.</p></body></html>"
+    
+    message.set_content(f"Hi {name},\nYour account has been reinstated. Welcome back!")
+    message.add_alternative(html_content, subtype="html")
+
+    try:
+        smtp_client = aiosmtplib.SMTP(hostname=settings.SMTP_HOST, port=settings.SMTP_PORT, use_tls=True)
+        await smtp_client.connect()
+        await smtp_client.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+        await smtp_client.send_message(message)
+        await smtp_client.quit()
+        print(f"Unban email sent to {email_to}")
+    except Exception as e:
+        print(f"Failed to send unban email: {e}")
+
+async def send_ai_reply_email(email_to: str, subject: str, original_content: str, reply_content: str):
+    """
+    Sends an AI-generated reply to a user's email.
+    """
+    if not settings.SMTP_USER or not settings.SMTP_PASSWORD:
+        print(f"SMTP not configured. Skipping AI reply email to {email_to}")
+        return
+
+    message = EmailMessage()
+    message["From"] = f"{settings.EMAILS_FROM_NAME} <{settings.EMAILS_FROM_EMAIL}>"
+    message["To"] = email_to
+    message["Subject"] = f"Re: {subject}"
+
+    # We'll use a simple themed wrapper for AI replies
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <style>
+            body {{ font-family: 'Inter', sans-serif; background-color: #0b101e; color: #f8fafc; margin: 0; padding: 0; }}
+            .container {{ max-width: 600px; margin: 40px auto; background-color: #131a2a; border-radius: 12px; overflow: hidden; border: 1px solid #263147; }}
+            .header {{ background-color: #0b101e; padding: 20px; text-align: center; border-bottom: 1px solid #263147; }}
+            .content {{ padding: 30px; }}
+            .reply-text {{ white-space: pre-wrap; line-height: 1.6; color: #cbd5e1; font-size: 15px; }}
+            .original-message {{ border-top: 1px solid #263147; margin-top: 30px; padding-top: 20px; color: #64748b; font-size: 13px; font-style: italic; }}
+            .footer {{ background-color: #0b101e; padding: 20px; text-align: center; color: #475569; font-size: 11px; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <img src="{LOGO_URL}" alt="Logo" style="width: 40px; height: 40px; border-radius: 8px;">
+            </div>
+            <div class="content">
+                <div class="reply-text">{reply_content}</div>
+                <div class="original-message">
+                    <strong>Original Message:</strong><br>
+                    {original_content}
+                </div>
+            </div>
+            <div class="footer">
+                © {datetime.now().year} PathFinder AI Support. Powered by Gemini AI.
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+
+    message.set_content(f"{reply_content}\n\n---\nOriginal Message:\n{original_content}")
+    message.add_alternative(html_content, subtype="html")
+
+    try:
+        smtp_client = aiosmtplib.SMTP(hostname=settings.SMTP_HOST, port=settings.SMTP_PORT, use_tls=True)
+        await smtp_client.connect()
+        await smtp_client.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+        await smtp_client.send_message(message)
+        await smtp_client.quit()
+        print(f"AI reply email sent to {email_to}")
+    except Exception as e:
+        print(f"Failed to send AI reply email: {e}")
