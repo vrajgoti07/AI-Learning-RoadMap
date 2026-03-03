@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, BackgroundTasks
 from bson import ObjectId
 from datetime import datetime
 import os
@@ -7,6 +7,7 @@ from app.schemas.user import ThemeUpdateRequest, ChangePasswordRequest, PlanUpgr
 from app.core.deps import get_current_user_object
 from app.core.security import verify_password, get_password_hash
 from app.database.connection import users_collection
+from app.services.email import send_account_deleted_email
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
@@ -109,7 +110,10 @@ async def delete_profile_picture(current_user: dict = Depends(get_current_user_o
     return {"status": "success", "message": "Profile picture removed"}
 
 @router.delete("/account")
-async def delete_account(current_user: dict = Depends(get_current_user_object)):
+async def delete_account(background_tasks: BackgroundTasks, current_user: dict = Depends(get_current_user_object)):
+    # Trigger account deletion email
+    background_tasks.add_task(send_account_deleted_email, current_user["email"], current_user.get("name", "User"))
+
     # Delete profile picture if it exists
     if current_user.get("profile_pic"):
         file_path = current_user["profile_pic"].lstrip("/")

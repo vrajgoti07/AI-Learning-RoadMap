@@ -387,3 +387,38 @@ async def send_ai_reply_email(email_to: str, subject: str, original_content: str
         print(f"AI reply email sent to {email_to}")
     except Exception as e:
         print(f"Failed to send AI reply email: {e}")
+
+async def send_account_deleted_email(email_to: str, name: str):
+    """
+    Sends a confirmation email when a user deletes their account.
+    """
+    if not settings.SMTP_USER or not settings.SMTP_PASSWORD:
+        print(f"SMTP not configured. Skipping account deleted email to {email_to}")
+        return
+
+    message = EmailMessage()
+    message["From"] = f"{settings.EMAILS_FROM_NAME} <{settings.EMAILS_FROM_EMAIL}>"
+    message["To"] = email_to
+    message["Subject"] = "Account Deleted - PathFinder AI"
+
+    template_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "templates", "account_deleted_email.html")
+    try:
+        with open(template_path, "r", encoding="utf-8") as file:
+            html_content = file.read()
+            html_content = html_content.replace("{{name}}", name).replace("{{logo_url}}", LOGO_URL)
+    except Exception as e:
+        print(f"Account deleted template not found, using fallback. Error: {e}")
+        html_content = f"<html><body><h1>Account Deleted</h1><p>Hi {name}, your account has been successfully deleted. We are sorry to see you go.</p></body></html>"
+    
+    message.set_content(f"Hi {name},\nYour account has been deleted successfully. We are sorry to see you go!\n\nBest wishes,\nThe PathFinder AI Team")
+    message.add_alternative(html_content, subtype="html")
+
+    try:
+        smtp_client = aiosmtplib.SMTP(hostname=settings.SMTP_HOST, port=settings.SMTP_PORT, use_tls=True)
+        await smtp_client.connect()
+        await smtp_client.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+        await smtp_client.send_message(message)
+        await smtp_client.quit()
+        print(f"Account deleted email sent to {email_to}")
+    except Exception as e:
+        print(f"Failed to send account deleted email: {e}")
