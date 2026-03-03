@@ -9,7 +9,8 @@ import {
     Calendar,
     Youtube,
     ExternalLink,
-    Lock
+    Lock,
+    Send
 } from 'lucide-react';
 import Timeline from '../components/Timeline';
 import RoadmapCard from '../components/RoadmapCard';
@@ -18,12 +19,18 @@ import GlassCard from '../components/GlassCard';
 import UpgradeModal from '../components/UpgradeModal';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../utils/api';
+import { useToast } from '../context/ToastContext';
 
 export default function RoadmapDetail() {
     const { id } = useParams();
     const navigate = useNavigate();
     const { plan } = useAuth();
+    const { showToast } = useToast();
     const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+
+    // AI Refinement States
+    const [prompt, setPrompt] = useState("");
+    const [isRefining, setIsRefining] = useState(false);
 
     // State for the roadmap
     const [roadmap, setRoadmap] = useState(null);
@@ -31,6 +38,7 @@ export default function RoadmapDetail() {
 
     useEffect(() => {
         const fetchRoadmap = async () => {
+            setLoading(true);
             try {
                 const data = await api.get(`/roadmaps/${id}`);
                 setRoadmap(data);
@@ -49,18 +57,50 @@ export default function RoadmapDetail() {
             setIsUpgradeModalOpen(true);
             return;
         }
-        alert("Exporting your roadmap as PDF... (Simulation)");
+        showToast("Exporting your roadmap as PDF...", "info");
     };
 
     const handleToggleComplete = async (nodeId, currentStatus) => {
         try {
+            console.log("Toggling:", nodeId, "Current Status:", currentStatus);
             const response = await api.patch(`/roadmaps/${id}/progress`, {
                 node_id: nodeId,
                 is_completed: !currentStatus
             });
+            console.log("Response from server:", response);
             setRoadmap(response);
         } catch (err) {
-            console.error("Failed to update progress", err);
+            console.error("Failed to update progress:", err);
+            // Most likely we are getting a 400 or 404 from the server
+            // Let's ensure the user sees exactly what the API thinks is wrong
+            showToast(err.response?.data?.detail || err.message || "Failed to update progress", "error");
+        }
+    };
+
+    const handleRefine = async (e) => {
+        if (e) e.preventDefault();
+        if (!prompt.trim() || isRefining) return;
+
+        setIsRefining(true);
+        try {
+            const response = await api.post(`/roadmaps/${id}/refine`, {
+                prompt: prompt
+            });
+            setRoadmap(response);
+            setPrompt("");
+            showToast("Roadmap successfully refined!", "success");
+        } catch (err) {
+            console.error("Refinement failed:", err);
+            showToast(err.message || "Failed to refine roadmap. Please try again.", "error");
+        } finally {
+            setIsRefining(false);
+        }
+    };
+
+    const handleKeyDown = (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleRefine();
         }
     };
 
@@ -81,6 +121,7 @@ export default function RoadmapDetail() {
         const colors = ['#6366f1', '#06b6d4', '#10b981', '#f59e0b', '#ec4899'];
         return {
             ...n,
+            id: String(n.id || i),
             description: n.desc,
             title: n.label,
             color: colors[i % colors.length],
@@ -219,6 +260,54 @@ export default function RoadmapDetail() {
             </div>
 
             <UpgradeModal isOpen={isUpgradeModalOpen} onClose={() => setIsUpgradeModalOpen(false)} />
+
+            {/* Sticky Chat Input for Refinement */}
+            <div className="fixed bottom-0 left-0 right-0 p-4 md:p-8 pointer-events-none z-50">
+                <div className="max-w-4xl mx-auto">
+                    <div className="relative pointer-events-auto">
+                        {isRefining && (
+                            <div className="absolute inset-0 bg-[#0f0c29]/80 backdrop-blur-sm z-10 rounded-2xl flex flex-col items-center justify-center border border-indigo-500/30">
+                                <div className="flex space-x-2 mb-3">
+                                    <div className="w-2.5 h-2.5 bg-indigo-500 rounded-full animate-[bounce_1s_infinite_0ms]" />
+                                    <div className="w-2.5 h-2.5 bg-cyan-400 rounded-full animate-[bounce_1s_infinite_200ms]" />
+                                    <div className="w-2.5 h-2.5 bg-emerald-400 rounded-full animate-[bounce_1s_infinite_400ms]" />
+                                </div>
+                                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-400 animate-pulse">
+                                    Professor is refining curriculum...
+                                </span>
+                            </div>
+                        )}
+                        <form
+                            onSubmit={handleRefine}
+                            className="relative group bg-[#0f0c29]/90 backdrop-blur-2xl rounded-2xl border border-white/10 shadow-2xl overflow-hidden transition-all focus-within:border-indigo-500/50 focus-within:ring-4 focus-within:ring-indigo-500/10"
+                        >
+                            <textarea
+                                value={prompt}
+                                onChange={(e) => setPrompt(e.target.value)}
+                                onKeyDown={handleKeyDown}
+                                disabled={isRefining}
+                                placeholder="Message AI to refine this roadmap (e.g., 'Make it harder' or 'Focus on Security')..."
+                                className="w-full bg-transparent text-white px-6 py-6 pb-16 outline-none resize-none min-h-[120px] placeholder:text-slate-600 disabled:opacity-50"
+                                rows="1"
+                            />
+
+                            <div className="absolute bottom-4 right-4 left-6 flex justify-between items-center">
+                                <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest hidden sm:block">
+                                    {isRefining ? 'Updating Syllabus...' : 'Shift + Enter for new line'}
+                                </span>
+                                <button
+                                    type="submit"
+                                    disabled={!prompt.trim() || isRefining}
+                                    className="p-3 bg-white text-slate-900 rounded-xl font-black shadow-[0_0_20px_rgba(255,255,255,0.3)] hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:grayscale disabled:hover:scale-100 flex items-center justify-center ml-auto"
+                                >
+                                    <Send className="w-4 h-4" />
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
         </div>
     );
 }

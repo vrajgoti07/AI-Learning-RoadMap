@@ -111,7 +111,7 @@ export default function UserDashboardView() {
                         </div>
 
                         <button
-                            onClick={() => navigate(`/roadmap/${recentRoadmaps[0]?.id}`)}
+                            onClick={() => navigate(`/roadmap/${recentRoadmaps[0]?._id || recentRoadmaps[0]?.id}`)}
                             className="bg-white text-indigo-900 px-8 py-3.5 rounded-xl font-black text-xs uppercase tracking-widest flex items-center space-x-2 hover:bg-slate-100 transition-all shadow-xl shadow-white/5"
                         >
                             <PlayCircle className="w-5 h-5" />
@@ -143,7 +143,7 @@ export default function UserDashboardView() {
                                 const colors = ['#06b6d4', '#10b981', '#f59e0b', '#ec4899'];
                                 const color = colors[i % colors.length];
                                 return (
-                                    <GlassCard onClick={() => navigate(`/roadmap/${rm.id}`)} key={rm.id} className="min-w-[240px] p-5 shrink-0 snap-center border border-white/5 bg-white/[0.02] hover:bg-white/[0.04] cursor-pointer transition-colors group">
+                                    <GlassCard onClick={() => navigate(`/roadmap/${rm._id || rm.id}`)} key={rm._id || rm.id} className="min-w-[240px] p-5 shrink-0 snap-center border border-white/5 bg-white/[0.02] hover:bg-white/[0.04] cursor-pointer transition-colors group">
                                         <div className="flex justify-between items-start mb-4">
                                             <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/5" style={{ color: color }}>
                                                 <Target className="w-4 h-4" />

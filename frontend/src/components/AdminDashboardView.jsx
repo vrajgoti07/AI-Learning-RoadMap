@@ -5,13 +5,15 @@ import {
     CreditCard,
     Activity,
     ShieldCheck,
+    ShieldX,
     Ban,
     UserPlus,
     RefreshCw,
     MoreVertical,
     DollarSign,
     Zap,
-    ShieldAlert
+    ShieldAlert,
+    RotateCcw
 } from 'lucide-react';
 import {
     BarChart, Bar,
@@ -22,6 +24,8 @@ import {
 import { useAuth } from '../context/AuthContext';
 import GlassCard from './GlassCard';
 import { api } from '../utils/api';
+import ConfirmDialog from './ConfirmDialog';
+import Toast from './Toast';
 
 export default function AdminDashboardView() {
     const { user } = useAuth();
@@ -31,44 +35,96 @@ export default function AdminDashboardView() {
     const [usersList, setUsersList] = useState([]);
     const [recentActivity, setRecentActivity] = useState([]);
 
+    // Toast and Confirm states
+    const [toast, setToast] = useState(null);
+    const [confirmDialog, setConfirmDialog] = useState(null);
+
+    const showToast = (message, type = 'info') => {
+        setToast({ message, type });
+        setTimeout(() => setToast(null), 3000);
+    };
+
+    const confirm = (message, confirmText = 'Confirm') => {
+        return new Promise((resolve) => {
+            setConfirmDialog({
+                message,
+                confirmText,
+                onConfirm: () => {
+                    setConfirmDialog(null);
+                    resolve(true);
+                },
+                onCancel: () => {
+                    setConfirmDialog(null);
+                    resolve(false);
+                }
+            });
+        });
+    };
+
+    const fetchData = async () => {
+        try {
+            const [st, pd, td, ul, ra] = await Promise.all([
+                api.get('/admin/stats'),
+                api.get('/admin/plan-distribution'),
+                api.get('/admin/roadmap-trends'),
+                api.get('/users'),
+                api.get('/admin/recent-activity')
+            ]);
+
+            setStats(st);
+            setRecentActivity(ra);
+
+            // Map Plan Distribution
+            const colorMap = { 'GO': '#f8fafc', 'PRO': '#06b6d4', 'PLUS': '#6366f1', 'PRO PLUS': '#8b5cf6' };
+            setPlanData(pd.map(p => ({
+                name: p.plan,
+                value: p.count,
+                color: colorMap[p.plan] || '#10b981'
+            })));
+
+            // Map Trends
+            setTrendData(td.map(t => ({
+                day: t.date?.split('-')[2] || '0', // get just the day
+                count: t.count
+            })));
+
+            setUsersList(ul);
+        } catch (error) {
+            console.error("Admin fetch failed:", error);
+        }
+    };
+
     useEffect(() => {
         if (user?.role !== 'ADMIN') return;
-
-        const fetchData = async () => {
-            try {
-                const [st, pd, td, ul, ra] = await Promise.all([
-                    api.get('/admin/stats'),
-                    api.get('/admin/plan-distribution'),
-                    api.get('/admin/roadmap-trends'),
-                    api.get('/users'),
-                    api.get('/admin/recent-activity')
-                ]);
-
-                setStats(st);
-                setRecentActivity(ra);
-
-                // Map Plan Distribution
-                const colorMap = { 'GO': '#f8fafc', 'PRO': '#06b6d4', 'PLUS': '#6366f1', 'PRO PLUS': '#8b5cf6' };
-                setPlanData(pd.map(p => ({
-                    name: p.plan,
-                    value: p.count,
-                    color: colorMap[p.plan] || '#10b981'
-                })));
-
-                // Map Trends
-                setTrendData(td.map(t => ({
-                    day: t.date.split('-')[2], // get just the day
-                    count: t.count
-                })));
-
-                setUsersList(ul);
-            } catch (error) {
-                console.error("Admin fetch failed:", error);
-            }
-        };
-
         fetchData();
     }, [user]);
+
+    const handleUserAction = async (usr, action) => {
+        const userId = usr.id || usr._id;
+
+        if (action === 'ban' || action === 'unban') {
+            const confirmed = await confirm(
+                `Are you sure you want to ${action} ${usr.name}?`,
+                action === 'ban' ? 'Ban User' : 'Unban User'
+            );
+            if (!confirmed) return;
+        }
+
+        try {
+            let endpoint = '';
+            if (action === 'promote') endpoint = `/users/${userId}/promote`;
+            else if (action === 'demote') endpoint = `/users/${userId}/demote`;
+            else if (action === 'ban') endpoint = `/users/${userId}/ban`;
+            else if (action === 'unban') endpoint = `/users/${userId}/unban`;
+
+            await api.put(endpoint);
+            showToast(`User successfully ${action}d`, 'success');
+            fetchData();
+        } catch (error) {
+            console.error(`User ${action} failed:`, error);
+            showToast(error.response?.data?.detail || `Failed to ${action} user`, 'error');
+        }
+    };
 
     if (user?.role !== 'ADMIN') {
         return (
@@ -197,12 +253,42 @@ export default function AdminDashboardView() {
                                             </td>
                                             <td className="py-4 text-right pr-2">
                                                 <div className="flex justify-end space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <button className="p-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 rounded-lg transition-colors" title="Promote">
-                                                        <ShieldCheck className="w-4 h-4" />
-                                                    </button>
-                                                    <button className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors" title="Ban User">
-                                                        <Ban className="w-4 h-4" />
-                                                    </button>
+                                                    {usr.role === 'ADMIN' ? (
+                                                        <button
+                                                            onClick={() => handleUserAction(usr, 'demote')}
+                                                            className="p-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 rounded-lg transition-colors"
+                                                            title="Revoke Admin"
+                                                        >
+                                                            <ShieldX className="w-4 h-4" />
+                                                        </button>
+                                                    ) : (
+                                                        <button
+                                                            onClick={() => handleUserAction(usr, 'promote')}
+                                                            disabled={usr.role === 'BANNED'}
+                                                            className="p-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 rounded-lg transition-colors disabled:opacity-30"
+                                                            title="Promote to Admin"
+                                                        >
+                                                            <ShieldCheck className="w-4 h-4" />
+                                                        </button>
+                                                    )}
+
+                                                    {usr.role === 'BANNED' ? (
+                                                        <button
+                                                            onClick={() => handleUserAction(usr, 'unban')}
+                                                            className="p-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 rounded-lg transition-colors"
+                                                            title="Unban User"
+                                                        >
+                                                            <RotateCcw className="w-4 h-4" />
+                                                        </button>
+                                                    ) : (
+                                                        <button
+                                                            onClick={() => handleUserAction(usr, 'ban')}
+                                                            className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors"
+                                                            title="Ban User"
+                                                        >
+                                                            <Ban className="w-4 h-4" />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>
@@ -309,6 +395,18 @@ export default function AdminDashboardView() {
                     </GlassCard>
                 </div>
             </div>
+            {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+            {confirmDialog && (
+                <ConfirmDialog
+                    isOpen={true}
+                    title="Admin Action Required"
+                    message={confirmDialog.message}
+                    confirmText={confirmDialog.confirmText}
+                    onConfirm={confirmDialog.onConfirm}
+                    onCancel={confirmDialog.onCancel}
+                    type={confirmDialog.confirmText.includes('Ban') ? 'danger' : 'info'}
+                />
+            )}
         </div>
     );
 }

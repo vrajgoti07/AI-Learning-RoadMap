@@ -22,13 +22,39 @@ export default function NotificationDropdown({ isOpen, onClose, role }) {
             setLoading(true);
             try {
                 const data = await api.get('/notifications');
-                // The backend currently only tracks basic messages, we will enrich them with UI icons for now
-                const enriched = data.map((n, idx) => ({
+                const iconMap = {
+                    zap: Zap,
+                    crown: Crown,
+                    alert: AlertCircle,
+                    check: CheckCircle2,
+                    info: Bell,
+                    shield: Zap // Fallback
+                };
+
+                const colorMap = {
+                    zap: 'text-yellow-400',
+                    crown: 'text-amber-400',
+                    alert: 'text-red-400',
+                    check: 'text-emerald-400',
+                    info: 'text-indigo-400'
+                };
+
+                const titleMap = {
+                    zap: 'Roadmap Ready',
+                    crown: 'Account Promoted',
+                    alert: 'System Alert',
+                    check: 'Success',
+                    info: 'Notification'
+                };
+
+                const enriched = data.map((n) => ({
                     ...n,
-                    title: 'System Alert',
+                    id: n._id, // Ensure we use _id from backend
+                    unread: !n.is_read, // Map backend is_read to frontend unread
+                    title: titleMap[n.type] || 'System Alert',
                     desc: n.message,
-                    icon: Bell,
-                    color: 'text-indigo-500',
+                    icon: iconMap[n.type] || Bell,
+                    color: colorMap[n.type] || 'text-indigo-500',
                     time: new Date(n.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                 }));
                 setNotifications(enriched);
@@ -41,6 +67,24 @@ export default function NotificationDropdown({ isOpen, onClose, role }) {
 
         fetchNotifications();
     }, [isOpen]);
+
+    const handleMarkAsRead = async (id) => {
+        try {
+            await api.put(`/notifications/${id}/read`);
+            setNotifications(prev => prev.map(n => n.id === id ? { ...n, unread: false } : n));
+        } catch (error) {
+            console.error("Failed to mark as read", error);
+        }
+    };
+
+    const handleMarkAllAsRead = async () => {
+        try {
+            await api.put('/notifications/read-all');
+            setNotifications(prev => prev.map(n => ({ ...n, unread: false })));
+        } catch (error) {
+            console.error("Failed to mark all as read", error);
+        }
+    };
 
     if (!isOpen) return null;
 
@@ -69,6 +113,7 @@ export default function NotificationDropdown({ isOpen, onClose, role }) {
                         notifications.map((notif) => (
                             <div
                                 key={notif.id}
+                                onClick={() => notif.unread && handleMarkAsRead(notif.id)}
                                 className={`p-4 rounded-2xl border transition-all cursor-pointer group ${notif.unread ? 'bg-white/5 border-indigo-500/20' : 'bg-transparent border-white/5 hover:bg-white/[0.02]'
                                     }`}
                             >
@@ -96,7 +141,10 @@ export default function NotificationDropdown({ isOpen, onClose, role }) {
                     )}
                 </div>
 
-                <button className="w-full mt-6 py-3.5 border border-white/5 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 hover:text-white hover:bg-white/5 transition-all">
+                <button
+                    onClick={handleMarkAllAsRead}
+                    className="w-full mt-6 py-3.5 border border-white/5 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 hover:text-white hover:bg-white/5 transition-all"
+                >
                     Mark all as read
                 </button>
             </div>

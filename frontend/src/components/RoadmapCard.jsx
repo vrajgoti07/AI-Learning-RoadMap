@@ -12,36 +12,51 @@ export default function RoadmapCard({ phase, title, duration, description, proje
                 className="cursor-pointer p-6"
                 onClick={() => setIsExpanded(!isExpanded)}
             >
-                <div className="flex justify-between items-center mb-4">
-                    <div className="flex items-center space-x-3">
-                        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-cyan-400 bg-cyan-400/5 px-3 py-1 rounded-full border border-cyan-400/10">
-                            {phase || `Phase ${index + 1}`}
-                        </span>
-                        <span className="text-[10px] font-bold text-slate-500 flex items-center">
-                            <Layout className="w-3 h-3 mr-1.5" />
-                            {duration}
-                        </span>
+                <div className="flex justify-between items-start mb-4">
+                    <div className="flex flex-col space-y-3">
+                        <div className="flex items-center space-x-3">
+                            <span className="text-[9px] font-black uppercase tracking-[0.2em] text-cyan-400 bg-cyan-400/5 px-3 py-1 rounded-full border border-cyan-400/10">
+                                {phase || `Phase ${index + 1}`}
+                            </span>
+                            <span className="text-[10px] font-bold text-slate-500 flex items-center">
+                                <Layout className="w-3 h-3 mr-1.5" />
+                                {duration}
+                            </span>
+                        </div>
+                        <h3 className={`text-2xl font-black tracking-tight uppercase flex items-center transition-all duration-500 ${isCompleted ? 'text-slate-500 line-through decoration-emerald-500/50 decoration-2' : 'text-white'}`}>
+                            <span className={`mr-3 transition-colors duration-500 ${isCompleted ? 'text-emerald-500/50' : 'text-indigo-500'}`}>0{index + 1}</span>
+                            {title}
+                        </h3>
                     </div>
 
-                    <div className="flex items-center space-x-3">
-                        <button
-                            onClick={(e) => { e.stopPropagation(); onToggleComplete(id, isCompleted); }}
-                            className={`flex items-center text-xs font-bold uppercase tracking-widest px-3 py-1.5 rounded-full transition-colors ${isCompleted
-                                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                                    : 'bg-white/5 text-slate-400 border border-white/10 hover:bg-white/10 hover:text-white'
-                                }`}
-                        >
-                            {isCompleted ? <CheckCircle2 className="w-4 h-4 mr-1.5" /> : <Circle className="w-4 h-4 mr-1.5" />}
-                            {isCompleted ? 'Completed' : 'Mark Complete'}
-                        </button>
-                        {isExpanded ? <ChevronUp className="w-5 h-5 text-slate-500" /> : <ChevronDown className="w-5 h-5 text-slate-500" />}
+                    <div className="flex flex-col items-end space-y-3">
+                        <div className="flex items-center space-x-3">
+                            <button
+                                onClick={(e) => { e.stopPropagation(); onToggleComplete(id, isCompleted); }}
+                                className={`flex items-center justify-center space-x-2 text-[10px] font-black uppercase tracking-[0.2em] px-5 py-2.5 rounded-2xl transition-all duration-300 transform active:scale-[0.92] shadow-lg
+                                ${isCompleted
+                                        ? 'bg-emerald-500 text-white shadow-emerald-500/20 hover:bg-emerald-400 hover:shadow-emerald-400/30'
+                                        : 'bg-[#151226]/50 text-slate-400 border border-white/10 hover:bg-white/5 hover:text-white hover:border-indigo-500/50 backdrop-blur-md'
+                                    }`}
+                            >
+                                {isCompleted ? (
+                                    <>
+                                        <CheckCircle2 className="w-4 h-4 animate-in zoom-in spin-in-12 duration-300" />
+                                        <span>Mastered</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Circle className="w-4 h-4 group-hover:text-indigo-400 transition-colors" />
+                                        <span>Mark Complete</span>
+                                    </>
+                                )}
+                            </button>
+                            <div className="p-2 rounded-xl bg-white/5 hover:bg-white/10 transition-colors pointer-events-none">
+                                {isExpanded ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
+                            </div>
+                        </div>
                     </div>
                 </div>
-
-                <h3 className={`text-xl font-black tracking-tight uppercase flex items-center ${isCompleted ? 'text-slate-400 line-through' : 'text-white'}`}>
-                    <span className="text-indigo-500 mr-3">0{index + 1}</span>
-                    {title}
-                </h3>
             </div>
 
             {/* Expanded Content */}

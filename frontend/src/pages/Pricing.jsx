@@ -4,6 +4,7 @@ import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { useToast } from '../context/ToastContext';
 
 const plans = [
     {
@@ -58,12 +59,13 @@ const plans = [
 
 export default function Pricing() {
     const { plan, upgradePlan, user } = useAuth();
+    const { showToast } = useToast();
     const navigate = useNavigate();
 
     const handleUpgrade = (planName) => {
         if (planName !== 'GO') {
             upgradePlan(planName);
-            alert(`Success! You are now a ${planName} member.`);
+            showToast(`Success! You are now a ${planName} member.`, 'success');
             navigate('/dashboard');
         }
     };

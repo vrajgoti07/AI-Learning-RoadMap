@@ -5,6 +5,7 @@ if (base_url.endsWith('8000')) {
     base_url = `${base_url}/api`;
 }
 const API_URL = base_url;
+export const BASE_URL = base_url.replace(/\/api$/, '');
 
 const handleResponse = async (response, originalRequest = null) => {
     if (!response.ok) {
@@ -139,6 +140,38 @@ export const api = {
         const options = {
             method: 'DELETE',
             headers,
+        };
+        const url = `${API_URL}${endpoint}`;
+
+        const response = await fetch(url, options);
+        return handleResponse(response, { url, options, headers });
+    },
+
+    async patch(endpoint, data) {
+        const token = localStorage.getItem('token');
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const options = {
+            method: 'PATCH',
+            headers,
+            body: JSON.stringify(data),
+        };
+        const url = `${API_URL}${endpoint}`;
+
+        const response = await fetch(url, options);
+        return handleResponse(response, { url, options, headers });
+    },
+
+    async postMultipart(endpoint, formData) {
+        const token = localStorage.getItem('token');
+        const headers = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const options = {
+            method: 'POST',
+            headers,
+            body: formData,
         };
         const url = `${API_URL}${endpoint}`;
 

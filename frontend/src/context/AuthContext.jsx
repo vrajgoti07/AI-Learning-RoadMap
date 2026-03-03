@@ -91,8 +91,14 @@ export function AuthProvider({ children }) {
         }
     };
 
+    const updateUserInfo = (newData) => {
+        if (user) {
+            setUser({ ...user, ...newData });
+        }
+    };
+
     return (
-        <AuthContext.Provider value={{ user, login, googleLogin, signup, logout, plan, upgradePlan, loading }}>
+        <AuthContext.Provider value={{ user, login, googleLogin, signup, logout, plan, upgradePlan, updateUserInfo, loading }}>
             {children}
         </AuthContext.Provider>
     );

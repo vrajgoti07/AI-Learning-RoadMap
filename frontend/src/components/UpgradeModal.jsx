@@ -2,12 +2,14 @@ import React, { useState } from 'react';
 import { Check, X, Crown, Zap } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../utils/api';
+import { useToast } from '../context/ToastContext';
 
 export default function UpgradeModal({ isOpen, onClose }) {
     const [isLoading, setIsLoading] = useState(false);
 
     // Fallback: we should refresh the user context properly when integrated
     const { user, upgradePlan } = useAuth();
+    const { showToast } = useToast();
 
     if (!isOpen) return null;
 
@@ -28,7 +30,7 @@ export default function UpgradeModal({ isOpen, onClose }) {
             // 1. Load Razorpay script
             const res = await loadRazorpayScript();
             if (!res) {
-                alert("Razorpay SDK failed to load. Are you online?");
+                showToast("Razorpay SDK failed to load. Please check your connection.", "error");
                 return;
             }
 
@@ -57,12 +59,12 @@ export default function UpgradeModal({ isOpen, onClose }) {
                         });
 
                         // Payment Success!
-                        alert("Payment successful! Welcome to PRO.");
+                        showToast("Payment successful! Welcome to PRO.", "success");
                         upgradePlan('PRO');
                         onClose();
 
                     } catch (error) {
-                        alert("Payment verification failed. Please contact support.");
+                        showToast("Payment verification failed. Please contact support.", "error");
                     }
                 },
                 prefill: {
@@ -77,13 +79,13 @@ export default function UpgradeModal({ isOpen, onClose }) {
             // 5. Open Razorpay Checkou Form
             const paymentObject = new window.Razorpay(options);
             paymentObject.on('payment.failed', function (response) {
-                alert("Payment failed! Reason: " + response.error.description);
+                showToast("Payment failed: " + response.error.description, "error");
             });
             paymentObject.open();
 
         } catch (error) {
             console.error("Error upgrading:", error);
-            alert("An error occurred during checkout setup.");
+            showToast("An error occurred during checkout setup.", "error");
         } finally {
             setIsLoading(false);
         }

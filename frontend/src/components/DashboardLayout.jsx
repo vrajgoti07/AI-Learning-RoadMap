@@ -4,6 +4,7 @@ import { useLocation } from 'react-router-dom';
 import { Menu, Search, Bell } from 'lucide-react';
 import NotificationDropdown from './NotificationDropdown';
 import { useAuth } from '../context/AuthContext';
+import { api } from '../utils/api';
 
 export default function DashboardLayout({ children }) {
     const location = useLocation();
@@ -11,13 +12,39 @@ export default function DashboardLayout({ children }) {
     const [isNotificationOpen, setIsNotificationOpen] = useState(false);
     const [hasUnread, setHasUnread] = useState(false);
 
-    // WebSocket logic for real-time notifications
+    // Sidebar state
+    const [sidebarWidth, setSidebarWidth] = useState(() => {
+        const saved = localStorage.getItem('sidebarWidth');
+        return saved ? parseInt(saved, 10) : 280;
+    });
+    const [isSidebarVisible, setIsSidebarVisible] = useState(() => {
+        const saved = localStorage.getItem('isSidebarVisible');
+        return saved !== null ? JSON.parse(saved) : true;
+    });
+
     useEffect(() => {
+        localStorage.setItem('sidebarWidth', sidebarWidth);
+    }, [sidebarWidth]);
+
+    useEffect(() => {
+        localStorage.setItem('isSidebarVisible', isSidebarVisible);
+    }, [isSidebarVisible]);
+    useEffect(() => {
+        const fetchInitialUnread = async () => {
+            try {
+                const data = await api.get('/notifications');
+                const unread = data.some(n => !n.is_read);
+                setHasUnread(unread);
+            } catch (err) {
+                console.error("Failed to fetch initial notifications", err);
+            }
+        };
+        if (user) fetchInitialUnread();
+
         const token = localStorage.getItem('token');
         if (!token) return;
 
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        // Adjust host if VITE_API_URL is set, otherwise use current host
         const apiHost = import.meta.env.VITE_API_URL
             ? new URL(import.meta.env.VITE_API_URL).host
             : 'localhost:8000';
@@ -37,8 +64,7 @@ export default function DashboardLayout({ children }) {
         };
 
         socket.onclose = () => {
-            console.log("WebSocket disconnected. Attempting to reconnect in 5s...");
-            // Simple reconnect logic could go here
+            console.log("WebSocket disconnected.");
         };
 
         return () => socket.close();
@@ -63,9 +89,19 @@ export default function DashboardLayout({ children }) {
     };
 
     return (
-        <div className="min-h-screen bg-[#0B0914] flex">
+        <div
+            className="min-h-screen bg-[#0B0914] flex"
+            style={{
+                '--sidebar-width': isSidebarVisible ? `${sidebarWidth}px` : '0px'
+            }}
+        >
             {/* Sidebar is fixed on desktop */}
-            <Sidebar />
+            <Sidebar
+                width={sidebarWidth}
+                setWidth={setSidebarWidth}
+                isVisible={isSidebarVisible}
+                setIsVisible={setIsSidebarVisible}
+            />
 
             {/* Mobile Header (Hidden on Large screens) */}
             <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-[#0B0914] border-b border-white/5 z-50 flex items-center justify-between px-6">
@@ -76,7 +112,9 @@ export default function DashboardLayout({ children }) {
             </div>
 
             {/* Main Content Area */}
-            <main className="flex-grow lg:ml-72 flex flex-col min-h-screen">
+            <main
+                className="flex-grow flex flex-col min-h-screen transition-all duration-300 ease-in-out lg:ml-[var(--sidebar-width)]"
+            >
                 {/* Internal Top Bar (Dashboard style) */}
                 <header className="h-20 flex items-center justify-between px-8 lg:px-12 shrink-0 z-50">
                     <h1 className="text-2xl font-black text-white tracking-tight">{getTitle()}</h1>
