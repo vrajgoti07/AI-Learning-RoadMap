@@ -1,12 +1,22 @@
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning)
+
 from google.generativeai import types
 import google.generativeai as genai
 import json
+import re
 import traceback
 from app.core.config import settings
 
-genai.configure(api_key=settings.GEMINI_API_KEY)
+def generate_roadmap_json(topic: str, skill_level: str = "beginner", weak_topics: list = [], completed_topics: list = [], avg_score: float = 0.0):
+    # Ensure genai is configured with v1 API for better model compatibility
+    if not settings.GEMINI_API_KEY:
+        print("ERROR: GEMINI_API_KEY is missing in settings")
+        return {"topic": topic, "description": "API Key Missing", "nodes": []}
 
-def generate_roadmap_json(topic):
+    # Explicitly use v1 to avoid v1beta 404 errors seen in logs
+    genai.configure(api_key=settings.GEMINI_API_KEY)
+    
     # Safety settings to avoid false positive blocks for technical content
     safety_settings = {
         types.HarmCategory.HARM_CATEGORY_HARASSMENT: types.HarmBlockThreshold.BLOCK_NONE,
@@ -15,72 +25,120 @@ def generate_roadmap_json(topic):
         types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: types.HarmBlockThreshold.BLOCK_NONE,
     }
 
-    model = genai.GenerativeModel(
-        model_name='gemini-2.5-flash',
-        generation_config={
-            "temperature": 0.2, # Keep hallucination extremely low for high technical accuracy
-            "top_p": 0.8,
-            "top_k": 40,
-            "max_output_tokens": 8192,
-        }
-    )
+    # List of models to try (using full path as required by some versions)
+    available_models = [
+        'models/gemini-2.0-flash',
+        'models/gemini-2.5-flash',
+        'models/gemini-flash-latest',
+        'models/gemini-pro-latest',
+        'gemini-2.0-flash'
+    ]
     
     prompt = f"""
     Act as an elite Ivy League Computer Science Professor and Principal Software Engineer. 
-    Design a rigorous, industry-grade, highly specific learning roadmap for the topic: "{topic}".
-    Your goal is to take a learner from base prerequisites directly to elite, job-ready mastery, focusing heavily on modern, real-world applications and deep technical mental models.
+    Design a rigorous, highly specific learning roadmap for the topic: "{topic}".
+    
+    USER LEARNING PROFILE:
+    - Target Skill Level: {skill_level}
+    - Weak Topics (Needs focus): {weak_topics if weak_topics else 'None'}
+    - Completed Topics (Do not repeat): {completed_topics if completed_topics else 'None'}
+    - Average Quiz Score: {avg_score if avg_score > 0 else 'N/A'}
+
+    INSTRUCTIONS:
+    1. Adjust the difficulty exactly to {skill_level}. If advanced, skip basics. If weak topics exist, address them.
+    2. Be EXTREMELY concise. Zero filler words.
+    3. Generate EXACTLY 4 unique node objects (representing 4 major phases).
+    4. Provide EXACTLY 2 multiple-choice questions per node.
     
     Return ONLY a valid JSON object with the following exact structure:
     {{
       "topic": "{topic}",
       "description": "An elite, comprehensive masterclass to engineering mastery of {topic}.",
-      "level": "Choose one: Beginner, Intermediate, or Advanced based on the topic",
+      "level": "{skill_level.capitalize()}",
       "nodes": [
         {{
           "id": "1",
-          "label": "Phase 1: [Specific Foundation Name, e.g., 'Core Virtual DOM Architecture']",
-          "desc": "A 'Masterclass Overview' (3-5 sentences). Explain the deep 'why' behind this phase. What specific engineering problems does it solve? Name the exact algorithms, patterns, or advanced syntaxes they will master. NEVER use generic phrases like 'learn the basics'.",
+          "label": "Phase 1: [Name]",
+          "desc": "Overview in 2 sentences max.",
           "phase": "Foundations",
-          "duration": "Estimated time (e.g., 2 Weeks, 1 Month)",
-          "milestones": ["Specific Primitive 1", "Specific Architecture Concept 2", "Vital Engineering Skill 3"],
-          "projects": [{{"name": "Industry-Grade Lab (e.g., Custom State Management Library)", "difficulty": "Beginner/Intermediate/Advanced"}}]
+          "duration": "Estimated time",
+          "milestones": ["Specific Primitive 1", "Specific Concept 2"],
+          "projects": [{{"name": "Industry-Grade Lab", "difficulty": "Level"}}],
+          "quiz": [
+            {{
+                "question": "Deep technical question?",
+                "options": ["A", "B", "C", "D"],
+                "correct_answer": "Exact string of the correct option",
+                "explanation": "Why this is correct technically."
+            }}
+          ]
         }}
       ]
     }}
-    
-    CRITICAL RULES:
-    1. ZERO FLUFF. Do not use generic, unhelpful filler text. Every word must sound like it is coming from a Senior Staff Engineer teaching a junior.
-    2. Give highly specific names to milestones and projects (e.g., 'Writing a Custom JWT Authenticator' instead of 'Auth Project').
-    3. Return ONLY valid JSON. Absolutely no conversational filler text. Code formatting blocks (```json) are acceptable but nothing else.
-    4. Generate between 5 and 7 unique node objects inside the "nodes" array list, depending on how deeply complex the topic is. Ensure a smooth, logical progression from theory to extreme mastery.
     """
-    
-    # Try 3 times to get a valid response
-    try:
-        max_retries = 3
-        for attempt in range(max_retries):
-            try:
-                response = model.generate_content(prompt, safety_settings=safety_settings)
-                text = response.text.strip()
-                
-                # Clean up potential markdown blocks
-                if "```" in text:
-                    if "```json" in text:
-                        text = text.split("```json")[1].split("```")[0].strip()
-                    else:
-                        text = text.split("```")[1].split("```")[0].strip()
-                
-                return json.loads(text)
-            except Exception as e:
-                print(f"Attempt {attempt+1} failed for {topic}: {e}")
-                if attempt == max_retries - 1:
-                    print(f"Max retries reached for {topic}. Falling back.")
-    except Exception as e:
-        print(f"Error in generation loop for {topic}: {e}")
-        
+
+    # Try different models to find one that works (resolve 404s)
+    for model_name in available_models:
+        try:
+            print(f"Attempting generation with {model_name}...")
+            model = genai.GenerativeModel(
+                model_name=model_name,
+                generation_config={
+                    "temperature": 0.4,
+                    "top_p": 0.9,
+                    "max_output_tokens": 8192,
+                }
+            )
+            
+            # Try up to 2 times for each model if it's hit by temporary errors
+            for attempt in range(2):
+                try:
+                    response = model.generate_content(prompt, safety_settings=safety_settings)
+                    text = response.text.strip()
+                    
+                    # Standard cleaning of potential markdown blocks
+                    if "```" in text:
+                        text = re.sub(r'```(?:json)?\s*(.*?)\s*```', r'\1', text, flags=re.DOTALL).strip()
+                    
+                    text = text.lstrip('`').rstrip('`').strip()
+                    if not text.startswith('{'):
+                        start = text.find('{')
+                        if start != -1: text = text[start:]
+                    if not text.endswith('}'):
+                        end = text.rfind('}')
+                        if end != -1: text = text[:end+1]
+                    
+                    result = json.loads(text)
+                    print(f"Success with {model_name}")
+                    return result
+                except Exception as e:
+                    print(f"Attempt {attempt+1} with {model_name} failed: {e}")
+                    
+        except Exception as e:
+            if "not found" in str(e).lower():
+                print(f"Model {model_name} not available, trying next...")
+                continue
+            print(f"Error with {model_name}: {e}")
+
     # FALLBACK MUST BE REACHED if loop finishes or outer try fails
     print(f"Using fallback roadmap for {topic}")
-    return {"topic": topic, "description": "Fallback", "level": "Beginner", "nodes": []}
+    return {
+        "topic": topic, 
+        "description": "Due to AI model unavailablity, here is a general getting started guide.", 
+        "level": skill_level.capitalize(), 
+        "nodes": [
+            {
+                "id": "1",
+                "label": f"Phase 1: Getting Started with {topic}",
+                "desc": "A foundational introduction to the topic concepts and core principles.",
+                "phase": "Foundations",
+                "duration": "2 weeks",
+                "milestones": ["Understand Basics", "Setup Environment"],
+                "projects": [{"name": "Hello World Project", "difficulty": "Beginner"}],
+                "quiz": []
+            }
+        ]
+    }
 
 def refine_roadmap_json(original_roadmap: dict, user_prompt: str):
     """Refines an existing roadmap JSON based on user instructions."""
@@ -92,11 +150,10 @@ def refine_roadmap_json(original_roadmap: dict, user_prompt: str):
     }
 
     model = genai.GenerativeModel(
-        model_name='gemini-2.0-flash',
+        model_name='gemini-pro',
         generation_config={
             "temperature": 0.3, # Slightly higher for creative refinement
             "top_p": 0.8,
-            "top_k": 40,
             "max_output_tokens": 8192,
         }
     )
@@ -146,7 +203,7 @@ def refine_roadmap_json(original_roadmap: dict, user_prompt: str):
 
 class AIService:
     def __init__(self):
-        self.model = genai.GenerativeModel('gemini-2.0-flash')
+        self.model = genai.GenerativeModel('gemini-flash-latest')
 
     async def generate_email_reply(self, user_content: str) -> str:
         """

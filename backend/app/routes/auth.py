@@ -75,6 +75,13 @@ async def google_auth(request: GoogleLoginRequest, req: Request, background_task
                 "role": "USER",
                 "plan": "GO",
                 "theme_preference": "dark",
+                "xp": 0,
+                "level": 1,
+                "skill_profile": {},
+                "weak_topics": [],
+                "strong_topics": [],
+                "completed_topics": [],
+                "learning_streak": 0,
                 "created_at": datetime.utcnow(),
                 "updated_at": datetime.utcnow()
             }
@@ -120,6 +127,13 @@ async def signup(user: UserCreate, background_tasks: BackgroundTasks, request: R
         "role": "USER",
         "plan": "GO",
         "theme_preference": "dark",
+        "xp": 0,
+        "level": 1,
+        "skill_profile": {},
+        "weak_topics": [],
+        "strong_topics": [],
+        "completed_topics": [],
+        "learning_streak": 0,
         "created_at": datetime.utcnow(),
         "updated_at": datetime.utcnow()
     }

@@ -21,6 +21,13 @@ class UserResponse(UserBase):
     theme_preference: str
     profile_pic: Optional[str] = None
     bio: Optional[str] = None
+    xp: int = 0
+    level: int = 1
+    skill_profile: dict = {}
+    weak_topics: list[str] = []
+    strong_topics: list[str] = []
+    completed_topics: list[str] = []
+    learning_streak: int = 0
     created_at: datetime
     updated_at: datetime
 

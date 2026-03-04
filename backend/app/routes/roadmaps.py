@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from typing import List
 from bson import ObjectId
 from datetime import datetime
@@ -8,13 +8,16 @@ from app.core.deps import get_current_user_object
 from app.services.activity_log_service import log_activity
 from app.database.connection import roadmaps_collection
 from app.services.ai_service import generate_roadmap_json
-from app.services.youtube_service import search_youtube_videos
+from app.services.youtube_service import search_youtube_channels
 from app.services.notification_service import create_notification
+from celery.result import AsyncResult
+from app.core.limiter import limiter
 
 router = APIRouter(prefix="/roadmaps", tags=["Roadmaps"])
 
-@router.post("", response_model=RoadmapResponse, status_code=status.HTTP_201_CREATED)
-async def create_roadmap(roadmap: RoadmapCreate, current_user: dict = Depends(get_current_user_object)):
+@router.post("", status_code=status.HTTP_201_CREATED)
+@limiter.limit("5/minute")
+async def create_roadmap(request: Request, roadmap: RoadmapCreate, current_user: dict = Depends(get_current_user_object)):
     # Plan enforcement
     plan = current_user.get("plan", "GO")
     
@@ -23,41 +26,12 @@ async def create_roadmap(roadmap: RoadmapCreate, current_user: dict = Depends(ge
         if count >= 5:
             raise HTTPException(status_code=403, detail="Free plan limit reached. Upgrade to PRO to create more roadmaps.")
     
-    # 1. Generate Roadmap via Gemini
-    generated_data = generate_roadmap_json(roadmap.topic)
-    
-    if not generated_data:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to generate roadmap content. Please try again later."
-        )
-    
-    # 2. Enrich nodes with YouTube Videos
-    # Fetch exactly ONE set of 6 highly relevant, top-level full courses for the entire roadmap.
-    nodes = generated_data.get("nodes", [])
-    roadmap_topic = generated_data.get("topic", roadmap.topic)
-    
-    if nodes:
-        # Instead of 15 scattered videos across 5 searches, do 1 high-quality search
-        # Query specifically for full course channels to get the absolute best tutorials
-        search_query = f"top best {roadmap_topic} full length course channel tutorial"
-        try:
-             # We fetch EXACTLY 5 top-tier videos for the sidebar, attached to the first node.
-             top_videos = search_youtube_videos(search_query, max_results=5) 
-             for i, node in enumerate(nodes):
-                 if i == 0:
-                     node["videos"] = top_videos
-                 else:
-                     node["videos"] = []
-        except Exception as e:
-             print(f"YouTube search error: {e}")
-             for node in nodes:
-                 node["videos"] = []
-    
+    # Create initial "processing" document in MongoDB
     new_roadmap = {
         "user_id": current_user["_id"],
-        "topic": roadmap_topic,
-        "roadmap_data": generated_data,
+        "topic": roadmap.topic,
+        "roadmap_data": {}, 
+        "status": "processing",
         "is_pinned": False,
         "is_archived": False,
         "is_public": False,
@@ -66,25 +40,108 @@ async def create_roadmap(roadmap: RoadmapCreate, current_user: dict = Depends(ge
     }
     
     result = await roadmaps_collection.insert_one(new_roadmap)
-    
-    # Log Roadmap Generation
-    await log_activity(
-        user_id=str(current_user["_id"]),
-        action="GENERATE_ROADMAP",
-        details={"topic": roadmap_topic, "roadmap_id": str(result.inserted_id)}
-    )
+    roadmap_id_str = str(result.inserted_id)
 
-    # Trigger notification
-    await create_notification(
-        user_id=current_user["_id"],
-        message=f"Success! Your roadmap for '{roadmap_topic}' is ready.",
-        type="zap"
-    )
+    # 1. Provide Initial Context
+    user_skill_level = current_user.get("skill_profile", {}).get(roadmap.topic.lower(), "beginner")
+    weak_topics = current_user.get("weak_topics", [])
+    completed_topics = current_user.get("completed_topics", [])
 
-    created = await roadmaps_collection.find_one({"_id": result.inserted_id})
-    created["_id"] = str(created["_id"])
-    created["id"] = created["_id"]
-    return created
+    try:
+        # 2. Generate Roadmap via Gemini synchronously
+        generated_data = generate_roadmap_json(
+            topic=roadmap.topic,
+            skill_level=user_skill_level,
+            weak_topics=weak_topics,
+            completed_topics=completed_topics,
+            avg_score=0.0
+        )
+        
+        if not generated_data or not generated_data.get("nodes"):
+            raise Exception("Failed to generate robust AI content.")
+
+        # 3. Enrich nodes with YouTube Videos
+        nodes = generated_data.get("nodes", [])
+        roadmap_topic = generated_data.get("topic", roadmap.topic)
+        
+        if nodes:
+            search_query = roadmap_topic
+            try:
+                 top_videos = search_youtube_channels(search_query, max_results=5) 
+                 for i, node in enumerate(nodes):
+                     if i == 0:
+                         node["videos"] = top_videos
+                     else:
+                         node["videos"] = []
+            except Exception as e:
+                 print(f"YouTube search error: {e}")
+                 for node in nodes:
+                     node["videos"] = []
+
+        # 4. Save Complete Roadmap to DB
+        await roadmaps_collection.update_one(
+            {"_id": result.inserted_id},
+            {
+                "$set": {
+                    "roadmap_data": generated_data,
+                    "topic": roadmap_topic,
+                    "status": "completed",
+                    "updated_at": datetime.utcnow()
+                }
+            }
+        )
+        
+        # 5. Notify User & Log
+        await create_notification(
+            user_id=current_user["_id"],
+            message=f"Success! Your roadmap for '{roadmap_topic}' is ready.",
+            type="zap"
+        )
+        await log_activity(
+            user_id=str(current_user["_id"]),
+            action="GENERATE_ROADMAP",
+            details={"topic": roadmap.topic, "roadmap_id": roadmap_id_str}
+        )
+        
+        return {"status": "completed", "roadmap_id": roadmap_id_str, "topic": roadmap_topic}
+
+    except Exception as e:
+        error_msg = str(e)
+        print(f"Roadmap Generation Failed for {roadmap.topic}: {error_msg}")
+        await roadmaps_collection.update_one(
+            {"_id": result.inserted_id},
+            {
+                "$set": {
+                    "status": "failed",
+                    "error_message": error_msg,
+                    "updated_at": datetime.utcnow()
+                }
+            }
+        )
+        # Notify failure
+        await create_notification(
+            user_id=current_user["_id"],
+            message=f"Failed to generate roadmap for '{roadmap.topic}'. Please try again.",
+            type="error"
+        )
+        raise HTTPException(status_code=500, detail="Failed to generate AI roadmap.")
+
+@router.get("/status/{roadmap_id}")
+async def get_roadmap_status(roadmap_id: str, current_user: dict = Depends(get_current_user_object)):
+    """Polling endpoint for frontend to check generation status."""
+    try:
+        doc = await roadmaps_collection.find_one({"_id": ObjectId(roadmap_id), "user_id": current_user["_id"]})
+        if not doc:
+            raise HTTPException(status_code=404, detail="Roadmap not found")
+            
+        return {
+            "roadmap_id": str(doc["_id"]),
+            "status": doc.get("status", "completed"), # Fallback to completed for older docs
+            "topic": doc.get("topic", ""),
+            "error_message": doc.get("error_message")
+        }
+    except Exception:
+        raise HTTPException(status_code=404, detail="Roadmap not found")
 
 @router.get("", response_model=List[RoadmapResponse])
 async def get_user_roadmaps(archived: bool = False, current_user: dict = Depends(get_current_user_object)):
@@ -115,7 +172,8 @@ async def get_roadmap(id: str, current_user: dict = Depends(get_current_user_obj
         raise HTTPException(status_code=404, detail="Roadmap not found")
 
 @router.post("/{id}/refine", response_model=RoadmapResponse)
-async def refine_roadmap(id: str, refine_req: RoadmapRefineRequest, current_user: dict = Depends(get_current_user_object)):
+@limiter.limit("5/minute")
+async def refine_roadmap(request: Request, id: str, refine_req: RoadmapRefineRequest, current_user: dict = Depends(get_current_user_object)):
     try:
         # 1. Fetch existing
         doc = await roadmaps_collection.find_one({"_id": ObjectId(id), "user_id": current_user["_id"]})

@@ -85,6 +85,8 @@ roadmaps_collection = db["roadmaps"]
 notifications_collection = db["notifications"]
 analytics_collection = db["analytics"]
 newsletters_collection = db["newsletters"]
+quiz_attempts_collection = db["quiz_attempts"]
+learning_progress_collection = db["learning_progress"]
 
 
 def get_db():
