@@ -18,7 +18,7 @@ export default function Timeline({ milestones, completedIndex = -1 }) {
                                 )}
                             </span>
                             <p className={`text-base ${isCompleted ? 'text-cyan-100' : 'text-slate-300'}`}>
-                                {milestone}
+                                {typeof milestone === 'string' ? milestone : (milestone?.title || milestone?.name || milestone?.label || JSON.stringify(milestone))}
                             </p>
                         </div>
                     );

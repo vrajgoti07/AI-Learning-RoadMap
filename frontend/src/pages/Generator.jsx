@@ -47,17 +47,24 @@ export default function Generator() {
         setIsGenerating(true);
         try {
             const response = await api.post('/roadmaps', { topic });
-            const roadmapId = response.id || response._id;
-            navigate(`/roadmap/${roadmapId}`);
+            const roadmapId = response.roadmap_id || response.id || response._id;
+
+            // Navigate immediately since it is synchronous
+            if (response.status === 'completed' || response.roadmap_id) {
+                setIsGenerating(false);
+                navigate(`/roadmap/${roadmapId}`);
+            } else {
+                setIsGenerating(false);
+                showToast("Generation failed.", "error");
+            }
         } catch (error) {
+            setIsGenerating(false);
             if (error.message.includes('Limit reached') || error.message.includes('Free plan limit reached')) {
                 setIsUpgradeModalOpen(true);
             } else {
                 console.error("Failed to generate roadmap:", error);
                 showToast(error.message || "Failed to generate roadmap", "error");
             }
-        } finally {
-            setIsGenerating(false);
         }
     };
 

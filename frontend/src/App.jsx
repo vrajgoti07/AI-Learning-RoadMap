@@ -19,6 +19,7 @@ import Pricing from './pages/Pricing';
 import Users from './pages/Users';
 import Help from './pages/Help';
 import Activity from './pages/Activity';
+import AnalyticsDashboard from './features/analytics/Dashboard';
 
 function App() {
   return (
@@ -81,6 +82,13 @@ function App() {
               <ProtectedRoute>
                 <DashboardLayout>
                   <Activity />
+                </DashboardLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/analytics" element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <AnalyticsDashboard />
                 </DashboardLayout>
               </ProtectedRoute>
             } />

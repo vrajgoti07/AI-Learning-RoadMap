@@ -20,7 +20,9 @@ import {
     Pin,
     Archive,
     Trash2,
-    Check
+    Check,
+    Target,
+    Zap
 } from 'lucide-react';
 import Logo from './Logo';
 import { useAuth } from '../context/AuthContext';
@@ -158,6 +160,7 @@ export default function Sidebar({ width, setWidth, isVisible, setIsVisible }) {
         { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
         { name: 'Roadmap Generator', path: '/generator', icon: Wand2 },
         { name: 'Activity', path: '/activity', icon: Activity },
+        { name: 'Analytics', path: '/analytics', icon: Target },
         // Only show Users to ADMINs
         ...(user?.role === 'ADMIN' ? [{ name: 'User Management', path: '/users', icon: UsersIcon }] : []),
 
@@ -229,6 +232,36 @@ export default function Sidebar({ width, setWidth, isVisible, setIsVisible }) {
                         </Link>
                     ))}
                 </div>
+
+                {/* Gamification Stats */}
+                {user && (
+                    <div className="shrink-0 px-4 mt-2">
+                        <div className="bg-white/5 border border-white/10 rounded-xl p-3 relative overflow-hidden group">
+                            <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <div className="flex justify-between items-center mb-2">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-6 h-6 rounded-md bg-indigo-500/20 flex items-center justify-center border border-indigo-500/30">
+                                        <Zap className="w-3.5 h-3.5 text-indigo-400" />
+                                    </div>
+                                    <span className="text-xs font-bold text-slate-300">Level {user.level || 1}</span>
+                                </div>
+                                <span className="text-[10px] font-bold text-slate-500">{user.xp || 0} XP</span>
+                            </div>
+                            <div className="h-1.5 w-full bg-[#0B0914] rounded-full overflow-hidden">
+                                <div
+                                    className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full relative"
+                                    style={{ width: `${Math.min(((user.xp || 0) % 100) / 100 * 100, 100)}%` }}
+                                >
+                                    <div className="absolute inset-0 bg-white/20 animate-[shimmer_2s_infinite]" />
+                                </div>
+                            </div>
+                            <div className="mt-1.5 flex justify-between items-center text-[9px] text-slate-500 font-medium">
+                                <span>Started</span>
+                                <span>Next Level: {((user.level || 1) * 100)} XP</span>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* Recent Roadmaps History (ChatGPT style) */}
                 {user && (
